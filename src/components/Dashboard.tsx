@@ -6,9 +6,10 @@ const Dashboard: React.FC = () => {
     {
       id: '1',
       initials: 'AK',
-      content: 'New order #ORD-2024-001 - Order for 50 units of Industrial Bearing Set by Aida Kozhanova',
-      time: 'about 2 hours ago'
-    }
+      content:
+        'New order #ORD-2024-001 - Order for 50 units of Industrial Bearing Set by Aida Kozhanova',
+      time: 'about 2 hours ago',
+    },
   ];
 
   return (
@@ -42,12 +43,18 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <hr style={{ margin: '30px 0', border: 'none', borderTop: '1px solid #e5e5e5' }} />
+      <hr
+        style={{
+          margin: '30px 0',
+          border: 'none',
+          borderTop: '1px solid #e5e5e5',
+        }}
+      />
 
       {/* Recent Activity */}
       <div className="recent-activity">
         <h2 style={{ marginBottom: '20px' }}>Recent Activity</h2>
-        {activities.map(activity => (
+        {activities.map((activity) => (
           <div key={activity.id} className="activity-item">
             <div className="activity-avatar">{activity.initials}</div>
             <div className="activity-content">

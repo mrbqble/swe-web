@@ -51,7 +51,9 @@ function AppContent() {
     }
   };
 
-  const canAccessSettings = user.role === 'owner' || user.role === 'manager';
+  // Only supplier_owner and supplier_manager can access settings
+  const canAccessSettings =
+    user.role === 'supplier_owner' || user.role === 'supplier_manager';
 
   return (
     <div className="container">
@@ -63,7 +65,15 @@ function AppContent() {
             <div className="user-avatar">{user.avatar}</div>
             <div className="user-details">
               <div className="user-name">{user.name}</div>
-              <div className="user-role">{user.role}</div>
+              <div className="user-role">
+                {user.role === 'supplier_owner'
+                  ? 'Supplier Owner'
+                  : user.role === 'supplier_manager'
+                    ? 'Supplier Manager'
+                    : user.role === 'supplier_sales'
+                      ? 'Sales Representative'
+                      : user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+              </div>
             </div>
           </div>
         </div>

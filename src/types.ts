@@ -1,11 +1,10 @@
-export interface LinkRequest {
+// types/index.ts
+export interface User {
   id: string;
-  requester: string;
   email: string;
-  organization: string;
-  message: string;
-  date: string;
-  status: 'pending' | 'approved' | 'rejected';
+  name: string;
+  role: string;
+  avatar: string;
 }
 
 export interface Order {
@@ -15,8 +14,9 @@ export interface Order {
   organization: string;
   date: string;
   amount: string;
-  status: 'pending' | 'in-progress' | 'completed' | 'rejected';
+  status: string;
   items: number;
+  backendData?: any;
 }
 
 export interface Complaint {
@@ -26,18 +26,43 @@ export interface Complaint {
   organization: string;
   subject: string;
   priority: 'high' | 'medium' | 'low';
-  status: 'pending' | 'in-progress' | 'resolved';
+  status: string;
   updated: string;
   orderNumber: string;
   issueType: string;
+  backendData?: any;
 }
 
-export interface Manager {
+export interface LinkRequest {
   id: string;
-  name: string;
+  requester: string;
   email: string;
-  role: 'owner' | 'manager' | 'sales';
-  created: string;
+  organization: string;
+  message: string;
+  date: string;
+  status: string;
+  backendData?: any;
+}
+
+export interface ChatSession {
+  id: string;
+  consumerName: string;
+  salesRepName: string;
+  lastMessage: string;
+  timestamp: string;
+  unread: boolean;
+  backendData?: any;
+}
+
+export interface ChatMessage {
+  id: string;
+  sessionId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: string;
+  isOwn: boolean;
+  backendData?: any;
 }
 
 export interface Activity {
@@ -47,10 +72,33 @@ export interface Activity {
   time: string;
 }
 
-export interface User {
+export interface Manager {
   id: string;
-  email: string;
   name: string;
-  role: 'owner' | 'manager' | 'sales';
-  avatar?: string;
+  email: string;
+  role: 'manager' | 'sales';
+  created: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  companyName: string;
+  email: string;
+  isActive: boolean;
+  created: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: string;
+  currency: string;
+  sku: string;
+  stockQty: number;
+  isActive: boolean;
+  supplierId: string;
+  created: string;
+  backendData?: any;
 }
