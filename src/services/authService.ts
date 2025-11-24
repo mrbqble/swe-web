@@ -8,7 +8,10 @@ export interface LoginRequest {
 export interface SignupRequest {
   email: string;
   password: string;
+  first_name: string;
+  last_name: string;
   role: 'consumer' | 'supplier_owner';
+  organization_name?: string;
 }
 
 export interface TokenResponse {
@@ -20,6 +23,8 @@ export interface TokenResponse {
 export interface UserResponse {
   id: number;
   email: string;
+  first_name: string;
+  last_name: string;
   role: string;
   is_active: boolean;
   created_at: string;

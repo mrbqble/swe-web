@@ -3,16 +3,8 @@ import {
   authService,
   LoginRequest,
   SignupRequest,
-  UserResponse,
 } from '../services/authService';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  avatar: string;
-}
+import { User, transformUserResponse } from '../utils/userUtils';
 
 interface AuthContextType {
   user: User | null;
@@ -20,9 +12,13 @@ interface AuthContextType {
   signup: (
     email: string,
     password: string,
+    firstName: string,
+    lastName: string,
     role: 'consumer' | 'supplier_owner',
+    organizationName?: string,
   ) => Promise<boolean>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -43,7 +39,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         try {
           // Verify token is still valid by fetching current user
           const currentUser = await authService.getCurrentUser();
-          setUser(JSON.parse(savedUser));
+          const user = transformUserResponse(currentUser);
+          setUser(user);
+          localStorage.setItem('user', JSON.stringify(user));
         } catch (error) {
           // Token is invalid, clear storage
           localStorage.removeItem('access_token');
@@ -69,23 +67,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Get user info
       const userData = await authService.getCurrentUser();
-
-      // Create user object for frontend (you might want to adjust this based on your backend user model)
-      const user: User = {
-        id: userData.id.toString(),
-        email: userData.email,
-        name: userData.email.split('@')[0], // Simple name from email
-        role: userData.role,
-        avatar: userData.email.substring(0, 2).toUpperCase(),
-      };
+      const user = transformUserResponse(userData);
 
       setUser(user);
       localStorage.setItem('user', JSON.stringify(user));
       setIsLoading(false);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed:', error);
       setIsLoading(false);
+      // Error is already handled by the caller (Login component)
       return false;
     }
   };
@@ -93,11 +84,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const signup = async (
     email: string,
     password: string,
+    firstName: string,
+    lastName: string,
     role: 'consumer' | 'supplier_owner',
+    organizationName?: string,
   ): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const userData: SignupRequest = { email, password, role };
+      const userData: SignupRequest = {
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName,
+        role,
+        organization_name: organizationName,
+      };
       const tokens = await authService.signup(userData);
 
       // Store tokens
@@ -106,23 +107,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Get user info
       const userResponse = await authService.getCurrentUser();
-
-      const user: User = {
-        id: userResponse.id.toString(),
-        email: userResponse.email,
-        name: userResponse.email.split('@')[0],
-        role: userResponse.role,
-        avatar: userResponse.email.substring(0, 2).toUpperCase(),
-      };
+      const user = transformUserResponse(userResponse);
 
       setUser(user);
       localStorage.setItem('user', JSON.stringify(user));
       setIsLoading(false);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Signup failed:', error);
       setIsLoading(false);
+      // Error is already handled by the caller (Login component)
       return false;
+    }
+  };
+
+  const refreshUser = async (): Promise<void> => {
+    try {
+      const userData = await authService.getCurrentUser();
+      const user = transformUserResponse(userData);
+      setUser(user);
+      localStorage.setItem('user', JSON.stringify(user));
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+      // If refresh fails, user might need to re-authenticate
+      // Don't clear tokens here - let the API interceptor handle it
+      throw error;
     }
   };
 
@@ -134,7 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, refreshUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

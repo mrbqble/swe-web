@@ -36,23 +36,35 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refresh_token');
         if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refresh_token: refreshToken,
-          });
+          // Use axios directly (not api instance) to avoid interceptor loop
+          const response = await axios.post(
+            `${API_BASE_URL}/auth/refresh`,
+            {
+              refresh_token: refreshToken,
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            }
+          );
 
-          const { access_token, refresh_token } = response.data;
+          const { access_token, refresh_token: newRefreshToken } = response.data;
           localStorage.setItem('access_token', access_token);
-          localStorage.setItem('refresh_token', refresh_token);
+          localStorage.setItem('refresh_token', newRefreshToken);
 
           originalRequest.headers.Authorization = `Bearer ${access_token}`;
           return api(originalRequest);
         }
       } catch (refreshError) {
         // Refresh failed, logout user
+        console.error('Token refresh failed:', refreshError);
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        // Reload page to trigger login screen
+        // Could show a toast notification here: "Session expired. Please login again."
+        window.location.reload();
       }
     }
 

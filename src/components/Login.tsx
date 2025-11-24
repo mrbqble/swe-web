@@ -4,9 +4,11 @@ import { useAuth } from './AuthContext';
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState('');
   const [isSignup, setIsSignup] = useState(false);
-  const [role, setRole] = useState<'consumer' | 'supplier_owner'>('consumer');
   const { login, signup, isLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -15,34 +17,42 @@ const Login: React.FC = () => {
 
     let success = false;
     if (isSignup) {
-      success = await signup(email, password, role);
+      // Validate required fields for signup
+      if (!firstName.trim() || !lastName.trim()) {
+        setError('First name and last name are required');
+        return;
+      }
+      // Web app always signs up as supplier_owner
+      success = await signup(
+        email,
+        password,
+        firstName,
+        lastName,
+        'supplier_owner',
+        companyName.trim() || undefined,
+      );
     } else {
       success = await login(email, password);
     }
 
     if (!success) {
+      // More specific error messages could be added here based on error type
       setError(
         isSignup
-          ? 'Signup failed. Please try again.'
-          : 'Invalid email or password',
+          ? 'Signup failed. Please check your information and try again. Make sure your password meets the requirements.'
+          : 'Invalid email or password. Please try again.',
       );
     }
   };
 
-  const demoAccounts = [
-    { email: 'owner@kazsupply.kz', password: 'SecurePass123', role: 'Owner' },
-    {
-      email: 'manager@kazsupply.kz',
-      password: 'SecurePass123',
-      role: 'Manager',
-    },
-    { email: 'sales@kazsupply.kz', password: 'SecurePass123', role: 'Sales' },
-  ];
 
-  const fillDemo = (demoEmail: string, demoPassword: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setIsSignup(false);
+  // Reset form when switching between login/signup
+  const handleToggleSignup = () => {
+    setIsSignup(!isSignup);
+    setError('');
+    setFirstName('');
+    setLastName('');
+    setCompanyName('');
   };
 
   return (
@@ -57,21 +67,46 @@ const Login: React.FC = () => {
           {error && <div className="error-message">{error}</div>}
 
           {isSignup && (
-            <div className="form-group">
-              <label htmlFor="role">Role</label>
-              <select
-                id="role"
-                value={role}
-                onChange={(e) =>
-                  setRole(e.target.value as 'consumer' | 'supplier_owner')
-                }
-                required
-                disabled={isLoading}
-              >
-                <option value="consumer">Consumer</option>
-                <option value="supplier_owner">Supplier Owner</option>
-              </select>
-            </div>
+            <>
+              <div className="form-group">
+                <label htmlFor="firstName">First Name</label>
+                <input
+                  type="text"
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  minLength={1}
+                  maxLength={100}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="lastName">Last Name</label>
+                <input
+                  type="text"
+                  id="lastName"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  minLength={1}
+                  maxLength={100}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="companyName">Company Name (Optional)</label>
+                <input
+                  type="text"
+                  id="companyName"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+            </>
           )}
 
           <div className="form-group">
@@ -119,7 +154,7 @@ const Login: React.FC = () => {
         <div className="auth-switch">
           <button
             type="button"
-            onClick={() => setIsSignup(!isSignup)}
+            onClick={handleToggleSignup}
             className="switch-button"
           >
             {isSignup
@@ -127,27 +162,6 @@ const Login: React.FC = () => {
               : "Don't have an account? Sign up"}
           </button>
         </div>
-
-        {!isSignup && (
-          <div className="demo-accounts">
-            <h3>Demo Accounts:</h3>
-            {demoAccounts.map((account, index) => (
-              <div key={index} className="demo-account">
-                <span>
-                  <strong>{account.role}:</strong> {account.email}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => fillDemo(account.email, account.password)}
-                  className="demo-fill-button"
-                  disabled={isLoading}
-                >
-                  Fill
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

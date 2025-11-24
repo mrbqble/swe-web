@@ -1,71 +1,71 @@
-import React from 'react';
-import { Activity } from '../types';
+import React, { useState, useEffect } from 'react'
+import { useAuth } from './AuthContext'
+import { dataService } from '../services/dataService'
 
 const Dashboard: React.FC = () => {
-  const activities: Activity[] = [
-    {
-      id: '1',
-      initials: 'AK',
-      content:
-        'New order #ORD-2024-001 - Order for 50 units of Industrial Bearing Set by Aida Kozhanova',
-      time: 'about 2 hours ago',
-    },
-  ];
+	const { user } = useAuth()
+	const [pendingLinkRequests, setPendingLinkRequests] = useState<number>(0)
+	const [openOrders, setOpenOrders] = useState<number>(0)
+	const [openComplaints, setOpenComplaints] = useState<number>(0)
+	const [isLoading, setIsLoading] = useState(true)
 
-  return (
-    <div>
-      <div className="header">
-        <h1>Dashboard</h1>
-        <p>Welcome back! Here's what's happening with your business today.</p>
-      </div>
+	useEffect(() => {
+		const loadStats = async () => {
+			try {
+				setIsLoading(true)
 
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div>Pending Link Requests</div>
-          <div className="stat-number">3</div>
-          <div className="stat-change positive">+20% from last month</div>
-        </div>
-        <div className="stat-card">
-          <div>Open Orders</div>
-          <div className="stat-number">12</div>
-          <div className="stat-change positive">+8% from last month</div>
-        </div>
-        <div className="stat-card">
-          <div>Open Complaints</div>
-          <div className="stat-number">2</div>
-          <div className="stat-change negative">-15% from last month</div>
-        </div>
-        <div className="stat-card">
-          <div>Revenue</div>
-          <div className="stat-number">₸1,250,000</div>
-          <div className="stat-change positive">+25% from last month</div>
-        </div>
-      </div>
+				// Fetch pending link requests
+				const linkRequestsResponse = await dataService.getIncomingLinks(1, 1, 'pending')
+				setPendingLinkRequests(linkRequestsResponse.total || 0)
 
-      <hr
-        style={{
-          margin: '30px 0',
-          border: 'none',
-          borderTop: '1px solid #e5e5e5',
-        }}
-      />
+				// Fetch open orders (pending, accepted, in_progress)
+				const pendingOrdersResponse = await dataService.getOrders(1, 1, 'pending')
+				const acceptedOrdersResponse = await dataService.getOrders(1, 1, 'accepted')
+				const inProgressOrdersResponse = await dataService.getOrders(1, 1, 'in_progress')
+				setOpenOrders((pendingOrdersResponse.total || 0) + (acceptedOrdersResponse.total || 0) + (inProgressOrdersResponse.total || 0))
 
-      {/* Recent Activity */}
-      <div className="recent-activity">
-        <h2 style={{ marginBottom: '20px' }}>Recent Activity</h2>
-        {activities.map((activity) => (
-          <div key={activity.id} className="activity-item">
-            <div className="activity-avatar">{activity.initials}</div>
-            <div className="activity-content">
-              <div>{activity.content}</div>
-              <div className="activity-time">{activity.time}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+				// Fetch open complaints (open, escalated)
+				const openComplaintsResponse = await dataService.getComplaints(1, 1, 'open')
+				const escalatedComplaintsResponse = await dataService.getComplaints(1, 1, 'escalated')
+				setOpenComplaints((openComplaintsResponse.total || 0) + (escalatedComplaintsResponse.total || 0))
+			} catch (error) {
+				console.error('Failed to load dashboard stats:', error)
+			} finally {
+				setIsLoading(false)
+			}
+		}
 
-export default Dashboard;
+		loadStats()
+	}, [])
+
+	const welcomeMessage = user
+		? `Welcome back, ${user.firstName}! Here's what's happening with your business today.`
+		: "Welcome back! Here's what's happening with your business today."
+
+	return (
+		<div>
+			<div className="header">
+				<h1>Dashboard</h1>
+				<p>{welcomeMessage}</p>
+			</div>
+
+			{/* Stats Grid */}
+			<div className="stats-grid">
+				<div className="stat-card">
+					<div>Pending Link Requests</div>
+					<div className="stat-number">{isLoading ? '...' : pendingLinkRequests}</div>
+				</div>
+				<div className="stat-card">
+					<div>Open Orders</div>
+					<div className="stat-number">{isLoading ? '...' : openOrders}</div>
+				</div>
+				<div className="stat-card">
+					<div>Open Complaints</div>
+					<div className="stat-number">{isLoading ? '...' : openComplaints}</div>
+				</div>
+			</div>
+		</div>
+	)
+}
+
+export default Dashboard

@@ -1,33 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { dataService } from '../services/dataService';
 import { LinkRequest } from '../types';
+import { useAuth } from './AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 
 const LinkRequests: React.FC = () => {
   const [linkRequests, setLinkRequests] = useState<LinkRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const permissions = usePermissions();
 
-  useEffect(() => {
-    loadLinkRequests();
-  }, []);
-
-  const loadLinkRequests = async () => {
+  const loadLinkRequests = useCallback(async () => {
     try {
       const response = await dataService.getIncomingLinks();
       // Transform backend data to frontend format
       const transformedRequests: LinkRequest[] = response.items.map(
-        (item: any) => ({
-          id: item.id.toString(),
-          requester: `User ${item.consumer_id}`, // You might want to fetch consumer details
-          email: 'user@example.com', // You'll need to get this from consumer data
-          organization: 'Organization', // You'll need to get this from consumer data
-          message: 'Link request message...',
-          date: new Date(item.created_at).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-          }),
-          status: item.status,
-        }),
+        (item: any) => {
+          // Use consumer data from backend if available
+          const consumer = item.consumer || {};
+          const consumerName = consumer.user
+            ? `${consumer.user.first_name || ''} ${consumer.user.last_name || ''}`.trim()
+            : consumer.organization_name || `Consumer ${item.consumer_id}`;
+          const consumerEmail = consumer.user?.email || 'N/A';
+          const organization = consumer.organization_name || 'N/A';
+
+          return {
+            id: item.id.toString(),
+            requester: consumerName,
+            email: consumerEmail,
+            organization: organization,
+            message: item.message || 'Requesting to connect with your supplier account',
+            date: new Date(item.created_at).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            }),
+            status: item.status,
+            backendData: item, // Keep original data for reference
+          };
+        },
       );
       setLinkRequests(transformedRequests);
     } catch (error) {
@@ -35,14 +45,37 @@ const LinkRequests: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadLinkRequests();
+  }, [loadLinkRequests]);
 
   const handleApprove = async (linkId: string) => {
+    if (!permissions.canApproveLinkRequests) {
+      alert('You do not have permission to approve link requests');
+      return;
+    }
     try {
       await dataService.updateLinkStatus(parseInt(linkId), 'accepted');
       loadLinkRequests(); // Reload the list
     } catch (error) {
       console.error('Failed to approve link request:', error);
+      alert('Failed to approve link request');
+    }
+  };
+
+  const handleReject = async (linkId: string) => {
+    if (!permissions.canRejectLinkRequests) {
+      alert('You do not have permission to reject link requests');
+      return;
+    }
+    try {
+      await dataService.updateLinkStatus(parseInt(linkId), 'denied');
+      loadLinkRequests(); // Reload the list
+    } catch (error) {
+      console.error('Failed to reject link request:', error);
+      alert('Failed to reject link request');
     }
   };
 
@@ -103,12 +136,27 @@ const LinkRequests: React.FC = () => {
                   </td>
                   <td>
                     {request.status === 'pending' ? (
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => handleApprove(request.id)}
-                      >
-                        ✓ Approve
-                      </button>
+                      permissions.canApproveLinkRequests ? (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => handleApprove(request.id)}
+                          >
+                            ✓ Approve
+                          </button>
+                          {permissions.canRejectLinkRequests && (
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => handleReject(request.id)}
+                              style={{ color: '#ef4444', borderColor: '#ef4444' }}
+                            >
+                              ✗ Reject
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#666' }}>No permission</span>
+                      )
                     ) : (
                       <span style={{ color: '#666' }}>
                         {request.status.charAt(0).toUpperCase() +

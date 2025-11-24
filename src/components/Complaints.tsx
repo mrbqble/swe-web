@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Complaint } from '../types';
 import { dataService } from '../services/dataService';
+import { usePermissions } from '../hooks/usePermissions';
 import { useAuth } from './AuthContext';
+import ComplaintDetail from './ComplaintDetail';
 
 const Complaints: React.FC = () => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -9,68 +11,33 @@ const Complaints: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const permissions = usePermissions();
   const { user } = useAuth();
 
-  useEffect(() => {
-    loadComplaints();
-  }, [statusFilter]);
-
-  const loadComplaints = async () => {
+  const loadComplaints = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await dataService.getComplaints(
-        1,
+        currentPage,
         20,
         statusFilter || undefined,
       );
-      setComplaints(response.items);
+      setComplaints(response.items || []);
+      setTotalPages(response.pages || 1);
     } catch (error) {
       console.error('Failed to load complaints:', error);
-      // Fallback to mock data if API fails
-      setComplaints(getMockComplaints());
+      setComplaints([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, statusFilter]);
 
-  const getMockComplaints = (): Complaint[] => [
-    {
-      id: '1',
-      complaintNumber: 'CMP-2024-001',
-      customer: 'Dmitry Volkov',
-      organization: 'AlmatyTech Solutions',
-      subject: 'Defective bearing components',
-      priority: 'high',
-      status: 'open',
-      updated: 'Dec 25',
-      orderNumber: 'ORD-2024-001',
-      issueType: 'Quality Issue',
-    },
-    {
-      id: '2',
-      complaintNumber: 'CMP-2024-002',
-      customer: 'Elena Kuznetsova',
-      organization: 'Astana Engineering Ltd',
-      subject: 'Delayed delivery',
-      priority: 'medium',
-      status: 'open',
-      updated: 'Dec 23',
-      orderNumber: 'ORD-2024-002',
-      issueType: 'Delivery Issue',
-    },
-    {
-      id: '3',
-      complaintNumber: 'CMP-2024-003',
-      customer: 'Bakyt Serikbayev',
-      organization: 'Kazakhstan Metal Works',
-      subject: 'Incorrect product specifications',
-      priority: 'medium',
-      status: 'resolved',
-      updated: 'Dec 22',
-      orderNumber: '',
-      issueType: 'Product Mismatch',
-    },
-  ];
+  useEffect(() => {
+    loadComplaints();
+  }, [loadComplaints]);
 
   const handleStatusUpdate = async (
     complaintId: string,
@@ -83,10 +50,14 @@ const Complaints: React.FC = () => {
         newStatus,
         resolution,
       );
+      alert(`Complaint ${newStatus === 'escalated' ? 'escalated' : 'resolved'} successfully`);
       loadComplaints(); // Reload to reflect changes
-    } catch (error) {
+      if (selectedComplaintId === complaintId) {
+        setSelectedComplaintId(null); // Close detail if open
+      }
+    } catch (error: any) {
       console.error('Failed to update complaint status:', error);
-      alert('Failed to update complaint status');
+      alert(error?.response?.data?.detail || 'Failed to update complaint status');
     }
   };
 
@@ -119,9 +90,6 @@ const Complaints: React.FC = () => {
   const getStatusText = (status: string) => {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
-
-  const canManageComplaint =
-    user?.role === 'supplier_owner' || user?.role === 'supplier_manager';
 
   const filteredComplaints = complaints
     .filter(
@@ -169,7 +137,10 @@ const Complaints: React.FC = () => {
               <select
                 className="status-filter"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
               >
                 <option value="">All Status</option>
                 <option value="open">Open</option>
@@ -228,38 +199,53 @@ const Complaints: React.FC = () => {
                   </td>
                   <td>{complaint.updated}</td>
                   <td>
-                    {canManageComplaint && complaint.status !== 'resolved' && (
-                      <div style={{ display: 'flex', gap: '5px' }}>
-                        {complaint.status === 'open' && (
-                          <button
-                            className="btn btn-primary"
-                            onClick={() =>
-                              handleStatusUpdate(complaint.id, 'escalated')
-                            }
-                          >
-                            Escalate
-                          </button>
-                        )}
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => {
-                            const resolution = prompt('Enter resolution:');
-                            if (resolution) {
-                              handleStatusUpdate(
-                                complaint.id,
-                                'resolved',
-                                resolution,
-                              );
-                            }
-                          }}
-                        >
-                          Resolve
-                        </button>
-                      </div>
-                    )}
-                    {complaint.status === 'resolved' && (
-                      <span style={{ color: '#666' }}>Resolved</span>
-                    )}
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                      <button
+                        className="btn btn-outline"
+                        onClick={() => setSelectedComplaintId(complaint.id)}
+                        style={{ fontSize: '12px', padding: '4px 8px' }}
+                      >
+                        View Details
+                      </button>
+                      {complaint.status !== 'resolved' && (
+                        <>
+                          {complaint.status === 'open' && permissions.canEscalateComplaints && (
+                            <button
+                              className="btn btn-outline"
+                              onClick={() =>
+                                handleStatusUpdate(complaint.id, 'escalated')
+                              }
+                              style={{
+                                fontSize: '12px',
+                                padding: '4px 8px',
+                                color: '#ff9800',
+                                borderColor: '#ff9800',
+                              }}
+                            >
+                              Escalate
+                            </button>
+                          )}
+                          {permissions.canResolveComplaints && (
+                            <button
+                              className="btn btn-primary"
+                              onClick={() => {
+                                const resolution = prompt('Enter resolution:');
+                                if (resolution) {
+                                  handleStatusUpdate(
+                                    complaint.id,
+                                    'resolved',
+                                    resolution,
+                                  );
+                                }
+                              }}
+                              style={{ fontSize: '12px', padding: '4px 8px' }}
+                            >
+                              Resolve
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
                 <tr>
@@ -274,7 +260,46 @@ const Complaints: React.FC = () => {
             ))}
           </tbody>
         </table>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '10px',
+              marginTop: '20px',
+            }}
+          >
+            <button
+              className="btn btn-outline"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+            <span style={{ padding: '8px 16px', alignSelf: 'center' }}>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              className="btn btn-outline"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Complaint Detail Modal */}
+      {selectedComplaintId && (
+        <ComplaintDetail
+          complaintId={selectedComplaintId}
+          onClose={() => setSelectedComplaintId(null)}
+          onStatusUpdate={loadComplaints}
+        />
+      )}
     </div>
   );
 };

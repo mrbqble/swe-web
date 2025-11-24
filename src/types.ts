@@ -1,11 +1,6 @@
 // types/index.ts
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  avatar: string;
-}
+// Note: User interface is now defined in utils/userUtils.ts
+// Import it from there: import { User } from '../utils/userUtils';
 
 export interface Order {
   id: string;
@@ -51,6 +46,7 @@ export interface ChatSession {
   lastMessage: string;
   timestamp: string;
   unread: boolean;
+  orderId?: string;
   backendData?: any;
 }
 
@@ -62,6 +58,7 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   isOwn: boolean;
+  fileUrl?: string;
   backendData?: any;
 }
 
