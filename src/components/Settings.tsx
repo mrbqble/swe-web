@@ -3,10 +3,12 @@ import { Manager, Supplier } from '../types'
 import { dataService } from '../services/dataService'
 import { usePermissions } from '../hooks/usePermissions'
 import { useLanguage } from '../hooks/useLanguage'
+import { useAuth } from './AuthContext'
 import { t } from '../utils/i18n'
 
 const Settings: React.FC = () => {
 	const permissions = usePermissions()
+	const { logout } = useAuth()
 	const { language, changeLanguage } = useLanguage()
 	const [activeTab, setActiveTab] = useState<'profile' | 'managers' | 'account' | 'localization'>('profile')
 	const [managers, setManagers] = useState<Manager[]>([])
@@ -14,7 +16,8 @@ const Settings: React.FC = () => {
 	const [isLoading, setIsLoading] = useState(true)
 
 	const [newManager, setNewManager] = useState({
-		name: '',
+		first_name: '',
+		last_name: '',
 		email: '',
 		role: 'sales' as 'manager' | 'sales'
 	})
@@ -28,7 +31,8 @@ const Settings: React.FC = () => {
 
 	const [supplierProfile, setSupplierProfile] = useState({
 		company_name: '',
-		is_active: true
+		is_active: true,
+		company_logo: ''
 	})
 
 	const [userProfile, setUserProfile] = useState({
@@ -37,18 +41,20 @@ const Settings: React.FC = () => {
 		last_name: ''
 	})
 
-	const [passwordData, setPasswordData] = useState({
-		current_password: '',
-		new_password: '',
-		confirm_password: ''
-	})
-
 	const [isEditingProfile, setIsEditingProfile] = useState(false)
 	const [isEditingUserProfile, setIsEditingUserProfile] = useState(false)
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 	const [profileError, setProfileError] = useState<string | null>(null)
 	const [passwordError, setPasswordError] = useState<string | null>(null)
 	const [passwordSuccess, setPasswordSuccess] = useState(false)
+
+	const [editingManager, setEditingManager] = useState<{
+		id: string
+		first_name: string
+		last_name: string
+		email: string
+		role: 'manager' | 'sales'
+	} | null>(null)
 
 	const isOwner = permissions.canManageTeam
 
@@ -65,7 +71,8 @@ const Settings: React.FC = () => {
 				if (supplierData) {
 					setSupplierProfile({
 						company_name: supplierData.company_name || '',
-						is_active: supplierData.is_active ?? true
+						is_active: supplierData.is_active ?? true,
+						company_logo: supplierData.company_logo || ''
 					})
 				}
 				if (userData) {
@@ -106,13 +113,35 @@ const Settings: React.FC = () => {
 		}
 
 		try {
-			await dataService.addManager(newManager)
-			alert('Staff member creation should be done via user registration. Please contact support to add new team members.')
-			setNewManager({ name: '', email: '', role: 'sales' })
+			await dataService.addManager({
+				name: `${newManager.first_name} ${newManager.last_name}`.trim(),
+				email: newManager.email,
+				role: newManager.role,
+				isActive: true
+			})
+			setNewManager({ first_name: '', last_name: '', email: '', role: 'sales' })
+			loadData()
 		} catch (error: any) {
 			console.error('Failed to add manager:', error)
 			alert(error.message || 'Failed to add team member. Staff creation should be done via user registration.')
 		}
+	}
+
+	const handleCompanyLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0]
+		if (!file) return
+
+		const reader = new FileReader()
+		reader.onloadend = () => {
+			const result = reader.result as string
+			// result will be like "data:image/png;base64,AAAA..."
+			const base64 = result.includes(',') ? result.split(',')[1] : result
+			setSupplierProfile((prev) => ({
+				...prev,
+				company_logo: base64
+			}))
+		}
+		reader.readAsDataURL(file)
 	}
 
 	const handleUpdateSupplierProfile = async (e: React.FormEvent) => {
@@ -143,28 +172,7 @@ const Settings: React.FC = () => {
 		}
 	}
 
-	const handleChangePassword = async (e: React.FormEvent) => {
-		e.preventDefault()
-		if (passwordData.new_password !== passwordData.confirm_password) {
-			setPasswordError('New passwords do not match')
-			return
-		}
-		if (passwordData.new_password.length < 8) {
-			setPasswordError('Password must be at least 8 characters long')
-			return
-		}
-
-		try {
-			setPasswordError(null)
-			await dataService.changePassword(passwordData.current_password, passwordData.new_password)
-			setPasswordSuccess(true)
-			setPasswordData({ current_password: '', new_password: '', confirm_password: '' })
-			setTimeout(() => setPasswordSuccess(false), 3000)
-		} catch (error: any) {
-			console.error('Failed to change password:', error)
-			setPasswordError(error.response?.data?.detail || 'Failed to change password')
-		}
-	}
+	// Password change functionality moved to login (forgot password) flow
 
 	const handleDeleteManager = async (id: string) => {
 		if (!permissions.canManageTeam) {
@@ -293,7 +301,7 @@ const Settings: React.FC = () => {
 						</div>
 					)}
 
-					{!isEditingProfile ? (
+					{!isEditingProfile && !isEditingUserProfile ? (
 						<div
 							style={{
 								backgroundColor: 'white',
@@ -305,87 +313,243 @@ const Settings: React.FC = () => {
 							<div style={{ marginBottom: '15px' }}>
 								<strong>Company Name:</strong> {supplierProfile.company_name || 'Not set'}
 							</div>
+							{supplierProfile.company_logo && (
+								<div style={{ marginBottom: '15px' }}>
+									<strong>Company Logo:</strong>
+									<div
+										style={{
+											marginTop: '8px',
+											padding: '8px',
+											border: '1px solid #eee',
+											borderRadius: '4px',
+											display: 'inline-block',
+											backgroundColor: '#fafafa'
+										}}
+									>
+										<img
+											src={`data:image/png;base64,${supplierProfile.company_logo}`}
+											alt="Company logo"
+											style={{ maxWidth: '160px', maxHeight: '80px', display: 'block' }}
+										/>
+									</div>
+								</div>
+							)}
 							<div style={{ marginBottom: '15px' }}>
 								<strong>Status:</strong>{' '}
 								<span className={`status-badge ${supplierProfile.is_active ? 'status-completed' : 'status-rejected'}`}>
 									{supplierProfile.is_active ? 'Active' : 'Inactive'}
 								</span>
 							</div>
-							<button
-								className="btn btn-primary"
-								onClick={() => setIsEditingProfile(true)}
-							>
-								Edit Profile
-							</button>
+							<hr style={{ margin: '20px 0' }} />
+							<div style={{ marginBottom: '10px' }}>
+								<strong>Account Email:</strong> {userProfile.email}
+							</div>
+							<div style={{ marginBottom: '10px' }}>
+								<strong>First Name:</strong> {userProfile.first_name}
+							</div>
+							<div style={{ marginBottom: '15px' }}>
+								<strong>Last Name:</strong> {userProfile.last_name}
+							</div>
+							<div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+								<button
+									className="btn btn-primary"
+									onClick={() => setIsEditingProfile(true)}
+								>
+									Edit Company Profile
+								</button>
+								<button
+									className="btn btn-outline"
+									onClick={() => setIsEditingUserProfile(true)}
+								>
+									Edit Account Profile
+								</button>
+							</div>
 						</div>
 					) : (
-						<form onSubmit={handleUpdateSupplierProfile}>
-							<div
-								style={{
-									backgroundColor: 'white',
-									padding: '20px',
-									borderRadius: '8px',
-									border: '1px solid #ddd'
-								}}
-							>
+						<div
+							style={{
+								display: 'grid',
+								gridTemplateColumns: '1fr 1fr',
+								gap: '20px',
+								alignItems: 'flex-start'
+							}}
+						>
+							<form onSubmit={handleUpdateSupplierProfile}>
 								<div
-									className="form-group"
-									style={{ marginBottom: '15px' }}
+									style={{
+										backgroundColor: 'white',
+										padding: '20px',
+										borderRadius: '8px',
+										border: '1px solid #ddd'
+									}}
 								>
-									<label>Company Name *</label>
-									<input
-										type="text"
-										value={supplierProfile.company_name}
-										onChange={(e) =>
-											setSupplierProfile({
-												...supplierProfile,
-												company_name: e.target.value
-											})
-										}
-										required
-										style={{ width: '100%', padding: '8px' }}
-									/>
+									<h3 style={{ marginTop: 0, marginBottom: '15px' }}>Company Profile</h3>
+									<div
+										className="form-group"
+										style={{ marginBottom: '15px' }}
+									>
+										<label>Company Name *</label>
+										<input
+											type="text"
+											value={supplierProfile.company_name}
+											onChange={(e) =>
+												setSupplierProfile({
+													...supplierProfile,
+													company_name: e.target.value
+												})
+											}
+											required
+											style={{ width: '100%', padding: '8px' }}
+										/>
+									</div>
+									<div
+										className="form-group"
+										style={{ marginBottom: '15px' }}
+									>
+										<label>Status</label>
+										<select
+											value={supplierProfile.is_active.toString()}
+											onChange={(e) =>
+												setSupplierProfile({
+													...supplierProfile,
+													is_active: e.target.value === 'true'
+												})
+											}
+											style={{ width: '100%', padding: '8px' }}
+										>
+											<option value="true">Active</option>
+											<option value="false">Inactive</option>
+										</select>
+									</div>
+									<div
+										className="form-group"
+										style={{ marginBottom: '15px' }}
+									>
+										<label>Company Logo</label>
+										<input
+											type="file"
+											accept="image/*"
+											onChange={handleCompanyLogoChange}
+											style={{ width: '100%', padding: '8px' }}
+										/>
+										<small style={{ color: '#666', display: 'block', marginTop: '6px' }}>
+											Select an image; it will be converted to a base64 string and stored in the database.
+										</small>
+										{supplierProfile.company_logo && (
+											<div style={{ marginTop: '10px' }}>
+												<strong>Preview:</strong>
+												<div
+													style={{
+														marginTop: '8px',
+														padding: '8px',
+														border: '1px solid #eee',
+														borderRadius: '4px',
+														display: 'inline-block',
+														backgroundColor: '#fafafa'
+													}}
+												>
+													<img
+														src={`data:image/png;base64,${supplierProfile.company_logo}`}
+														alt="Company logo preview"
+														style={{ maxWidth: '160px', maxHeight: '80px', display: 'block' }}
+													/>
+												</div>
+											</div>
+										)}
+									</div>
+									<div style={{ display: 'flex', gap: '10px' }}>
+										<button
+											type="submit"
+											className="btn btn-primary"
+										>
+											Save Company
+										</button>
+										<button
+											type="button"
+											className="btn btn-outline"
+											onClick={() => {
+												setIsEditingProfile(false)
+												setProfileError(null)
+												loadData()
+											}}
+										>
+											Cancel
+										</button>
+									</div>
 								</div>
+							</form>
+
+							<form onSubmit={handleUpdateUserProfile}>
 								<div
-									className="form-group"
-									style={{ marginBottom: '15px' }}
+									style={{
+										backgroundColor: 'white',
+										padding: '20px',
+										borderRadius: '8px',
+										border: '1px solid #ddd'
+									}}
 								>
-									<label>Status</label>
-									<select
-										value={supplierProfile.is_active.toString()}
-										onChange={(e) =>
-											setSupplierProfile({
-												...supplierProfile,
-												is_active: e.target.value === 'true'
-											})
-										}
-										style={{ width: '100%', padding: '8px' }}
+									<h3 style={{ marginTop: 0, marginBottom: '15px' }}>Account Profile</h3>
+									<div
+										className="form-group"
+										style={{ marginBottom: '15px' }}
 									>
-										<option value="true">Active</option>
-										<option value="false">Inactive</option>
-									</select>
+										<label>Email *</label>
+										<input
+											type="email"
+											value={userProfile.email}
+											onChange={(e) => setUserProfile({ ...userProfile, email: e.target.value })}
+											required
+											style={{ width: '100%', padding: '8px' }}
+										/>
+									</div>
+									<div
+										className="form-group"
+										style={{ marginBottom: '15px' }}
+									>
+										<label>First Name *</label>
+										<input
+											type="text"
+											value={userProfile.first_name}
+											onChange={(e) => setUserProfile({ ...userProfile, first_name: e.target.value })}
+											required
+											style={{ width: '100%', padding: '8px' }}
+										/>
+									</div>
+									<div
+										className="form-group"
+										style={{ marginBottom: '15px' }}
+									>
+										<label>Last Name *</label>
+										<input
+											type="text"
+											value={userProfile.last_name}
+											onChange={(e) => setUserProfile({ ...userProfile, last_name: e.target.value })}
+											required
+											style={{ width: '100%', padding: '8px' }}
+										/>
+									</div>
+									<div style={{ display: 'flex', gap: '10px' }}>
+										<button
+											type="submit"
+											className="btn btn-primary"
+										>
+											Save Account
+										</button>
+										<button
+											type="button"
+											className="btn btn-outline"
+											onClick={() => {
+												setIsEditingUserProfile(false)
+												setProfileError(null)
+												loadData()
+											}}
+										>
+											Cancel
+										</button>
+									</div>
 								</div>
-								<div style={{ display: 'flex', gap: '10px' }}>
-									<button
-										type="submit"
-										className="btn btn-primary"
-									>
-										Save Changes
-									</button>
-									<button
-										type="button"
-										className="btn btn-outline"
-										onClick={() => {
-											setIsEditingProfile(false)
-											setProfileError(null)
-											loadData()
-										}}
-									>
-										Cancel
-									</button>
-								</div>
-							</div>
-						</form>
+							</form>
+						</div>
 					)}
 				</div>
 			)}
@@ -421,11 +585,24 @@ const Settings: React.FC = () => {
 									className="form-group"
 									style={{ flex: 1 }}
 								>
-									<label>Name</label>
+									<label>First Name</label>
 									<input
 										type="text"
-										value={newManager.name}
-										onChange={(e) => setNewManager({ ...newManager, name: e.target.value })}
+										value={newManager.first_name}
+										onChange={(e) => setNewManager({ ...newManager, first_name: e.target.value })}
+										required
+										style={{ width: '100%' }}
+									/>
+								</div>
+								<div
+									className="form-group"
+									style={{ flex: 1 }}
+								>
+									<label>Last Name</label>
+									<input
+										type="text"
+										value={newManager.last_name}
+										onChange={(e) => setNewManager({ ...newManager, last_name: e.target.value })}
 										required
 										style={{ width: '100%' }}
 									/>
@@ -469,12 +646,157 @@ const Settings: React.FC = () => {
 						</form>
 					)}
 
+					{editingManager && (
+						<form
+							onSubmit={async (e) => {
+								e.preventDefault()
+								try {
+									await dataService.updateManager(editingManager.id, {
+										first_name: editingManager.first_name,
+										last_name: editingManager.last_name,
+										email: editingManager.email,
+										role: editingManager.role
+									})
+									alert('Staff member updated successfully')
+									setEditingManager(null)
+									loadData()
+								} catch (error: any) {
+									console.error('Failed to update staff member:', error)
+									alert(error.response?.data?.detail || 'Failed to update staff member')
+								}
+							}}
+							style={{
+								marginBottom: '20px',
+								padding: '15px',
+								border: '1px solid #ddd',
+								borderRadius: '8px',
+								backgroundColor: '#f9fafb'
+							}}
+						>
+							<h4 style={{ marginTop: 0, marginBottom: '10px' }}>Edit Team Member</h4>
+							<div
+								style={{
+									display: 'flex',
+									gap: '15px',
+									alignItems: 'flex-end',
+									flexWrap: 'wrap'
+								}}
+							>
+								<div
+									className="form-group"
+									style={{ flex: 1, minWidth: '160px' }}
+								>
+									<label>First Name</label>
+									<input
+										type="text"
+										value={editingManager.first_name}
+										onChange={(e) =>
+											setEditingManager((prev) =>
+												prev
+													? {
+															...prev,
+															first_name: e.target.value
+													  }
+													: prev
+											)
+										}
+										required
+										style={{ width: '100%' }}
+									/>
+								</div>
+								<div
+									className="form-group"
+									style={{ flex: 1, minWidth: '160px' }}
+								>
+									<label>Last Name</label>
+									<input
+										type="text"
+										value={editingManager.last_name}
+										onChange={(e) =>
+											setEditingManager((prev) =>
+												prev
+													? {
+															...prev,
+															last_name: e.target.value
+													  }
+													: prev
+											)
+										}
+										required
+										style={{ width: '100%' }}
+									/>
+								</div>
+								<div
+									className="form-group"
+									style={{ flex: 1, minWidth: '200px' }}
+								>
+									<label>Email</label>
+									<input
+										type="email"
+										value={editingManager.email}
+										onChange={(e) =>
+											setEditingManager((prev) =>
+												prev
+													? {
+															...prev,
+															email: e.target.value
+													  }
+													: prev
+											)
+										}
+										required
+										style={{ width: '100%' }}
+									/>
+								</div>
+								<div
+									className="form-group"
+									style={{ minWidth: '140px' }}
+								>
+									<label>Role</label>
+									<select
+										value={editingManager.role}
+										onChange={(e) =>
+											setEditingManager((prev) =>
+												prev
+													? {
+															...prev,
+															role: e.target.value as 'manager' | 'sales'
+													  }
+													: prev
+											)
+										}
+										style={{ width: '100%' }}
+									>
+										<option value="sales">Sales</option>
+										<option value="manager">Manager</option>
+									</select>
+								</div>
+								<div style={{ display: 'flex', gap: '8px' }}>
+									<button
+										type="submit"
+										className="btn btn-primary"
+									>
+										Save
+									</button>
+									<button
+										type="button"
+										className="btn btn-outline"
+										onClick={() => setEditingManager(null)}
+									>
+										Cancel
+									</button>
+								</div>
+							</div>
+						</form>
+					)}
+
 					<table>
 						<thead>
 							<tr>
 								<th>Name</th>
 								<th>Email</th>
 								<th>Role</th>
+								<th>Status</th>
 								<th>Created</th>
 								<th>Actions</th>
 							</tr>
@@ -489,6 +811,11 @@ const Settings: React.FC = () => {
 											{manager.role.charAt(0).toUpperCase() + manager.role.slice(1)}
 										</span>
 									</td>
+									<td>
+										<span className={`status-badge ${manager.isActive ? 'status-completed' : 'status-rejected'}`}>
+											{manager.isActive ? 'Active' : 'Inactive'}
+										</span>
+									</td>
 									<td>{manager.created}</td>
 									<td>
 										<div style={{ display: 'flex', gap: '5px' }}>
@@ -496,25 +823,63 @@ const Settings: React.FC = () => {
 												<>
 													<button
 														className="btn btn-outline"
-														onClick={async () => {
-															if (window.confirm(`Are you sure you want to deactivate ${manager.name}?`)) {
-																try {
-																	await dataService.deactivateStaffMember(manager.id)
-																	alert('Staff member deactivated successfully')
-																	loadData()
-																} catch (error) {
-																	console.error('Failed to deactivate staff:', error)
-																	alert('Failed to deactivate staff member')
-																}
-															}
-														}}
-														style={{
-															color: '#ff9800',
-															borderColor: '#ff9800'
-														}}
+														onClick={() =>
+															setEditingManager({
+																id: manager.id,
+																first_name: manager.name.split(' ')[0] || '',
+																last_name: manager.name.split(' ').slice(1).join(' ') || '',
+																email: manager.email,
+																role: manager.role
+															})
+														}
 													>
-														Deactivate
+														Edit
 													</button>
+													{manager.isActive ? (
+														<button
+															className="btn btn-outline"
+															onClick={async () => {
+																if (window.confirm(`Are you sure you want to deactivate ${manager.name}?`)) {
+																	try {
+																		await dataService.deactivateStaffMember(manager.id)
+																		alert('Staff member deactivated successfully')
+																		loadData()
+																	} catch (error) {
+																		console.error('Failed to deactivate staff:', error)
+																		alert('Failed to deactivate staff member')
+																	}
+																}
+															}}
+															style={{
+																color: '#ff9800',
+																borderColor: '#ff9800'
+															}}
+														>
+															Deactivate
+														</button>
+													) : (
+														<button
+															className="btn btn-outline"
+															onClick={async () => {
+																if (window.confirm(`Are you sure you want to activate ${manager.name}?`)) {
+																	try {
+																		await dataService.activateStaffMember(manager.id)
+																		alert('Staff member activated successfully')
+																		loadData()
+																	} catch (error) {
+																		console.error('Failed to activate staff:', error)
+																		alert('Failed to activate staff member')
+																	}
+																}
+															}}
+															style={{
+																color: '#16a34a',
+																borderColor: '#16a34a'
+															}}
+														>
+															Activate
+														</button>
+													)}
 													<button
 														className="btn btn-outline"
 														onClick={() => handleDeleteManager(manager.id)}
@@ -666,241 +1031,7 @@ const Settings: React.FC = () => {
 						)}
 					</div>
 
-					{/* Password Change Section */}
-					<div
-						style={{
-							backgroundColor: 'white',
-							padding: '20px',
-							borderRadius: '8px',
-							border: '1px solid #ddd',
-							marginBottom: '30px'
-						}}
-					>
-						<h3 style={{ marginTop: 0, marginBottom: '15px' }}>Change Password</h3>
-						{passwordError && (
-							<div
-								style={{
-									backgroundColor: '#f8d7da',
-									border: '1px solid #f5c6cb',
-									color: '#721c24',
-									padding: '12px',
-									borderRadius: '4px',
-									marginBottom: '15px'
-								}}
-							>
-								{passwordError}
-							</div>
-						)}
-						{passwordSuccess && (
-							<div
-								style={{
-									backgroundColor: '#d4edda',
-									border: '1px solid #c3e6cb',
-									color: '#155724',
-									padding: '12px',
-									borderRadius: '4px',
-									marginBottom: '15px'
-								}}
-							>
-								Password changed successfully!
-							</div>
-						)}
-						<form onSubmit={handleChangePassword}>
-							<div
-								className="form-group"
-								style={{ marginBottom: '15px' }}
-							>
-								<label>Current Password *</label>
-								<input
-									type="password"
-									value={passwordData.current_password}
-									onChange={(e) =>
-										setPasswordData({
-											...passwordData,
-											current_password: e.target.value
-										})
-									}
-									required
-									style={{ width: '100%', padding: '8px' }}
-								/>
-							</div>
-							<div
-								className="form-group"
-								style={{ marginBottom: '15px' }}
-							>
-								<label>New Password *</label>
-								<input
-									type="password"
-									value={passwordData.new_password}
-									onChange={(e) =>
-										setPasswordData({
-											...passwordData,
-											new_password: e.target.value
-										})
-									}
-									required
-									minLength={8}
-									style={{ width: '100%', padding: '8px' }}
-								/>
-								<small style={{ color: '#666' }}>Password must be at least 8 characters long</small>
-							</div>
-							<div
-								className="form-group"
-								style={{ marginBottom: '15px' }}
-							>
-								<label>Confirm New Password *</label>
-								<input
-									type="password"
-									value={passwordData.confirm_password}
-									onChange={(e) =>
-										setPasswordData({
-											...passwordData,
-											confirm_password: e.target.value
-										})
-									}
-									required
-									minLength={8}
-									style={{ width: '100%', padding: '8px' }}
-								/>
-							</div>
-							<button
-								type="submit"
-								className="btn btn-primary"
-							>
-								Change Password
-							</button>
-						</form>
-					</div>
-
-					{/* Account Management Section - Only for Owners */}
-					{isOwner && (
-						<>
-							<div
-								style={{
-									backgroundColor: '#fff3cd',
-									border: '1px solid #ffc107',
-									padding: '20px',
-									borderRadius: '8px',
-									marginTop: '20px',
-									marginBottom: '20px'
-								}}
-							>
-								<h3 style={{ marginTop: 0, color: '#856404' }}>⚠️ Account Management</h3>
-								<p style={{ color: '#856404', marginBottom: '15px' }}>
-									These actions will affect your supplier account. Please proceed with caution.
-								</p>
-
-								<div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-									<button
-										className="btn btn-outline"
-										onClick={async () => {
-											if (window.confirm('Are you sure you want to deactivate your supplier account? You can reactivate it later.')) {
-												try {
-													await dataService.deactivateSupplierAccount()
-													alert('Supplier account deactivated successfully')
-													loadData()
-												} catch (error) {
-													console.error('Failed to deactivate account:', error)
-													alert('Failed to deactivate account')
-												}
-											}
-										}}
-										style={{
-											color: '#ff9800',
-											borderColor: '#ff9800'
-										}}
-									>
-										Deactivate Account
-									</button>
-									<button
-										className="btn btn-outline"
-										onClick={() => setShowDeleteConfirm(true)}
-										style={{
-											color: '#ef4444',
-											borderColor: '#ef4444'
-										}}
-									>
-										Delete Account
-									</button>
-								</div>
-							</div>
-
-							{showDeleteConfirm && (
-								<div
-									style={{
-										backgroundColor: '#f8d7da',
-										border: '1px solid #f5c6cb',
-										padding: '20px',
-										borderRadius: '8px',
-										marginTop: '20px'
-									}}
-								>
-									<h3 style={{ marginTop: 0, color: '#721c24' }}>⚠️ Delete Account Confirmation</h3>
-									<p style={{ color: '#721c24', marginBottom: '15px' }}>
-										<strong>This action cannot be undone. Deleting your account will:</strong>
-									</p>
-									<ul style={{ color: '#721c24', marginBottom: '15px' }}>
-										<li>Permanently delete your supplier account</li>
-										<li>Remove all associated data</li>
-										<li>Cancel all active orders and links</li>
-									</ul>
-									<p style={{ color: '#721c24', marginBottom: '15px' }}>
-										<strong>Please type "DELETE" in the field below to confirm:</strong>
-									</p>
-									<input
-										type="text"
-										id="delete-confirm-input"
-										placeholder="Type DELETE to confirm"
-										style={{
-											width: '100%',
-											padding: '10px',
-											marginBottom: '15px',
-											border: '1px solid #f5c6cb',
-											borderRadius: '4px'
-										}}
-									/>
-									<div style={{ display: 'flex', gap: '10px' }}>
-										<button
-											className="btn"
-											onClick={async () => {
-												const confirmInput = (document.getElementById('delete-confirm-input') as HTMLInputElement)?.value
-												if (confirmInput === 'DELETE') {
-													try {
-														await dataService.deleteSupplierAccount()
-														alert('Supplier account deleted successfully')
-														// Redirect to login or home page
-														window.location.href = '/'
-													} catch (error) {
-														console.error('Failed to delete account:', error)
-														alert('Failed to delete account')
-													}
-												} else {
-													alert('Please type "DELETE" to confirm')
-												}
-											}}
-											style={{
-												backgroundColor: '#ef4444',
-												color: 'white',
-												border: 'none'
-											}}
-										>
-											Confirm Delete
-										</button>
-										<button
-											className="btn btn-outline"
-											onClick={() => {
-												setShowDeleteConfirm(false)
-												const input = document.getElementById('delete-confirm-input') as HTMLInputElement
-												if (input) input.value = ''
-											}}
-										>
-											Cancel
-										</button>
-									</div>
-								</div>
-							)}
-						</>
-					)}
+					{/* Password change controls moved to login page (forgot password flow) */}
 				</div>
 			)}
 

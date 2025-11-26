@@ -22,7 +22,7 @@ const Orders: React.FC = () => {
 	const loadOrders = useCallback(async () => {
 		try {
 			setIsLoading(true)
-			const response = await dataService.getOrders(currentPage, 20, statusFilter || undefined)
+			const response = await dataService.getOrders(currentPage, 20)
 
 			setOrders(response.items || [])
 			setTotalPages(response.pages || 1)

@@ -28,6 +28,12 @@ export interface UserResponse {
   role: string;
   is_active: boolean;
   created_at: string;
+  // Optional supplier-related fields (if backend includes them)
+  company_logo?: string | null;
+  supplier?: {
+    company_logo?: string | null;
+    company_name?: string | null;
+  };
 }
 
 class AuthService {
@@ -51,6 +57,13 @@ class AuthService {
   async getCurrentUser(): Promise<UserResponse> {
     const response = await api.get<UserResponse>('/users/me');
     return response.data;
+  }
+
+  async resetPassword(email: string, newPassword: string): Promise<void> {
+    await api.post('/auth/reset-password', {
+      email,
+      new_password: newPassword,
+    });
   }
 }
 

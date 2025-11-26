@@ -4,7 +4,12 @@ import { dataService } from '../services/dataService'
 import { useAuth } from './AuthContext'
 import { usePermissions } from '../hooks/usePermissions'
 
-const Chat: React.FC = () => {
+interface ChatProps {
+	consumerId?: number
+	onContextClear?: () => void
+}
+
+const Chat: React.FC<ChatProps> = ({ consumerId, onContextClear }) => {
 	const [sessions, setSessions] = useState<ChatSession[]>([])
 	const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null)
 	const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -20,10 +25,25 @@ const Chat: React.FC = () => {
 			setIsLoading(true)
 			const response = await dataService.getChatSessions(1, 100) // Load all sessions
 
-			console.log(response.items)
-
 			setSessions(response.items)
-			if (response.items.length > 0 && !selectedSession) {
+
+			// If consumerId is provided, find and select that session
+			if (consumerId && response.items.length > 0) {
+				// Find session by consumerId from backend data
+				const targetSession = response.items.find((session: ChatSession) => {
+					const backendData = (session as any).backendData
+					return backendData?.consumer_id === consumerId
+				})
+
+				if (targetSession) {
+					setSelectedSession(targetSession)
+					if (onContextClear) {
+						onContextClear()
+					}
+				} else if (!selectedSession) {
+					setSelectedSession(response.items[0])
+				}
+			} else if (response.items.length > 0 && !selectedSession) {
 				setSelectedSession(response.items[0])
 			}
 		} catch (error) {
@@ -32,15 +52,13 @@ const Chat: React.FC = () => {
 		} finally {
 			setIsLoading(false)
 		}
-	}, [selectedSession])
+	}, [selectedSession, consumerId, onContextClear])
 
 	const loadMessages = useCallback(
 		async (sessionId: string) => {
 			if (!sessionId) return
 			try {
 				const response = await dataService.getChatMessages(parseInt(sessionId), 1, 100) // Load all messages
-
-				console.log(response.items)
 
 				// Transform messages to include isOwn based on current user
 				const transformedMessages = response.items.map((msg) => ({

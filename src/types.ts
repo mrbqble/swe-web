@@ -3,99 +3,106 @@
 // Import it from there: import { User } from '../utils/userUtils';
 
 export interface Order {
-  id: string;
-  orderNumber: string;
-  customer: string;
-  organization: string;
-  date: string;
-  amount: string;
-  status: string;
-  items: number;
-  backendData?: any;
+	id: string
+	orderNumber: string
+	customer: string
+	organization: string
+	date: string
+	amount: string
+	status: string
+	items: number
+	backendData?: any
 }
 
 export interface Complaint {
-  id: string;
-  complaintNumber: string;
-  customer: string;
-  organization: string;
-  subject: string;
-  priority: 'high' | 'medium' | 'low';
-  status: string;
-  updated: string;
-  orderNumber: string;
-  issueType: string;
-  backendData?: any;
+	id: string
+	complaintNumber: string
+	customer: string
+	organization: string
+	subject: string
+	priority: 'high' | 'medium' | 'low'
+	status: string
+	updated: string
+	orderNumber: string
+	issueType: string
+	backendData?: any
+	consumer?: {
+		id: number
+		name: string
+		email: string
+		organization_name: string
+	}
 }
 
 export interface LinkRequest {
-  id: string;
-  requester: string;
-  email: string;
-  organization: string;
-  message: string;
-  date: string;
-  status: string;
-  backendData?: any;
+	id: string
+	requester: string
+	email: string
+	organization: string
+	message: string
+	date: string
+	status: string
+	backendData?: any
 }
 
 export interface ChatSession {
-  id: string;
-  consumerName: string;
-  salesRepName: string;
-  lastMessage: string;
-  timestamp: string;
-  unread: boolean;
-  orderId?: string;
-  backendData?: any;
+	id: string
+	consumerName: string
+	salesRepName: string
+	lastMessage: string
+	timestamp: string
+	unread: boolean
+	orderId?: string
+	backendData?: any
 }
 
 export interface ChatMessage {
-  id: string;
-  sessionId: string;
-  senderId: string;
-  senderName: string;
-  text: string;
-  timestamp: string;
-  isOwn: boolean;
-  fileUrl?: string;
-  backendData?: any;
+	id: string
+	sessionId: string
+	senderId: string
+	senderName: string
+	text: string
+	timestamp: string
+	isOwn: boolean
+	fileUrl?: string
+	backendData?: any
 }
 
 export interface Activity {
-  id: string;
-  initials: string;
-  content: string;
-  time: string;
+	id: string
+	initials: string
+	content: string
+	time: string
 }
 
 export interface Manager {
-  id: string;
-  name: string;
-  email: string;
-  role: 'manager' | 'sales';
-  created: string;
+	id: string
+	name: string
+	email: string
+	role: 'manager' | 'sales'
+	created: string
+	isActive: boolean
 }
 
 export interface Supplier {
-  id: string;
-  name: string;
-  companyName: string;
-  email: string;
-  isActive: boolean;
-  created: string;
+	id: string
+	name: string
+	companyName: string
+	email: string
+	isActive: boolean
+	created: string
 }
 
 export interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: string;
-  currency: string;
-  sku: string;
-  stockQty: number;
-  isActive: boolean;
-  supplierId: string;
-  created: string;
-  backendData?: any;
+	id: string
+	name: string
+	description: string
+	price: string
+	currency: string
+	sku: string
+	stockQty: number
+	isActive: boolean
+	supplierId: string
+	created: string
+	backendData?: any
 }

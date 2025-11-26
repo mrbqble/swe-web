@@ -62,7 +62,6 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ orderId, onClose, onStatusUpd
 		try {
 			setIsLoading(true)
 			const response = await dataService.getOrder(parseInt(orderId))
-			console.log(response)
 
 			setOrder(response)
 		} catch (error) {
@@ -409,9 +408,18 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ orderId, onClose, onStatusUpd
 						<button
 							className="btn btn-outline"
 							onClick={() => {
-								// Navigate to chat for this order
-								if (user) {
-									window.location.hash = `chat?orderId=${order.id}`
+								// Navigate to chat for this order's consumer
+								const consumerId = order.consumer_id || order.consumer?.id
+								if (consumerId) {
+									const navigateToChat = (window as any).navigateToChat
+									if (navigateToChat && typeof navigateToChat === 'function') {
+										navigateToChat(consumerId)
+										onClose() // Close order detail when navigating to chat
+									} else {
+										alert('Unable to open chat. Please navigate to the Chat page manually.')
+									}
+								} else {
+									alert('Consumer information not available for this order.')
 								}
 							}}
 							aria-label={t('orderDetail.openChat')}

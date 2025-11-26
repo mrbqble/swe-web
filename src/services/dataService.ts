@@ -13,9 +13,11 @@ class DataService {
 	// Link Requests
 	async getIncomingLinks(page: number = 1, size: number = 20, status?: string): Promise<PaginatedResponse<LinkRequest>> {
 		try {
-			const response = await api.get('/links/incoming', {
-				params: { page, size, status }
-			})
+			const params: any = { page, size }
+			if (status) {
+				params.status = status
+			}
+			const response = await api.get('/links/incoming', { params })
 
 			const transformedRequests: LinkRequest[] = response.data.items.map((item: any) => {
 				const consumer = item.consumer || {}
@@ -110,18 +112,15 @@ class DataService {
 	}
 
 	async unlinkConsumer(linkId: number) {
-		// Unlink by returning the link status to pending (instead of blocking)
-		const response = await api.patch(`/links/${linkId}/status`, { status: 'pending' })
+		// Unlink by setting the link status to unlinked
+		const response = await api.patch(`/links/${linkId}/status`, { status: 'unlinked' })
 		return response.data
 	}
 
 	// Orders
-	async getOrders(page: number = 1, size: number = 20, status?: string): Promise<PaginatedResponse<Order>> {
+	async getOrders(page: number = 1, size: number = 20): Promise<PaginatedResponse<Order>> {
 		try {
 			const params: any = { page, size }
-			if (status) {
-				params.status = status
-			}
 			const response = await api.get('/orders', { params })
 
 			// Transform backend data to frontend format
@@ -193,9 +192,6 @@ class DataService {
 	async getComplaints(page: number = 1, size: number = 20, status?: string): Promise<PaginatedResponse<Complaint>> {
 		try {
 			const params: any = { page, size }
-			if (status) {
-				params.status = status
-			}
 			const response = await api.get('/complaints', { params })
 
 			// Transform backend data to frontend format
@@ -262,15 +258,30 @@ class DataService {
 	}
 
 	async updateComplaintStatus(complaintId: number, status: string, resolution?: string) {
-		const response = await api.patch(`/complaints/${complaintId}/status`, {
-			status,
-			resolution
-		})
+		const body: any = { status }
+		if (resolution !== undefined && resolution !== null) {
+			body.resolution = resolution
+		}
+		const response = await api.patch(`/complaints/${complaintId}/status`, body)
 		return response.data
 	}
 
 	async createComplaint(complaintData: any) {
+		// Backend expects: { order_id, sales_rep_id?, manager_id?, description }
+		// sales_rep_id and manager_id are optional - backend will auto-assign if not provided
 		const response = await api.post('/complaints', complaintData)
+		return response.data
+	}
+
+	async submitComplaintFeedback(complaintId: number, satisfied: boolean) {
+		// Backend: PATCH /complaints/{id}/feedback with { satisfied: boolean }
+		const response = await api.patch(`/complaints/${complaintId}/feedback`, { satisfied })
+		return response.data
+	}
+
+	async reopenComplaint(complaintId: number) {
+		// Backend: PATCH /complaints/{id}/reopen (no body required)
+		const response = await api.patch(`/complaints/${complaintId}/reopen`)
 		return response.data
 	}
 
@@ -391,6 +402,7 @@ class DataService {
 				name: `${staff.first_name || ''} ${staff.last_name || ''}`.trim() || 'Unknown',
 				email: staff.email || '',
 				role: (staff.role === 'manager' || staff.role === 'owner' ? 'manager' : 'sales') as 'manager' | 'sales',
+				isActive: staff.is_active ?? true,
 				created: staff.created_at
 					? new Date(staff.created_at).toLocaleDateString('en-US', {
 							year: 'numeric',
@@ -405,10 +417,53 @@ class DataService {
 		}
 	}
 
-	async addManager(managerData: Omit<Manager, 'id' | 'created'>): Promise<Manager> {
-		// Note: Staff creation should be done via user registration endpoint
-		// This is a placeholder that will show an error
-		throw new Error('Staff member creation should be done via user registration. Please contact support.')
+	async addManager(managerData: Omit<Manager, 'id' | 'created'> & { password?: string }): Promise<Manager> {
+		try {
+			// Backend expects POST /suppliers/staff with StaffCreateRequest schema:
+			// { email, password, first_name, last_name, staff_role: 'manager' | 'sales' }
+			// Password is required by backend, but we'll use a default if not provided
+			// In production, password should always be provided by the caller
+			const password = managerData.password || 'TempPassword123!'
+			const response = await api.post('/suppliers/staff', {
+				email: managerData.email,
+				password: password,
+				first_name: managerData.name.split(' ')[0] || '',
+				last_name: managerData.name.split(' ').slice(1).join(' ') || '',
+				staff_role: managerData.role === 'manager' ? 'manager' : 'sales'
+			})
+			// Backend returns StaffResponse
+			return {
+				id: response.data.id.toString(),
+				name: `${response.data.first_name || ''} ${response.data.last_name || ''}`.trim() || 'Unknown',
+				email: response.data.email || '',
+				role: (response.data.role === 'manager' || response.data.role === 'owner' ? 'manager' : 'sales') as 'manager' | 'sales',
+				isActive: response.data.is_active ?? true,
+				created: response.data.created_at
+					? new Date(response.data.created_at).toLocaleDateString('en-US', {
+							year: 'numeric',
+							month: 'short',
+							day: 'numeric'
+					  })
+					: 'N/A'
+			}
+		} catch (error) {
+			console.error('Failed to create staff member:', error)
+			throw error
+		}
+	}
+
+	async updateManager(managerId: string, data: { first_name: string; last_name: string; email: string; role: 'manager' | 'sales' }): Promise<void> {
+		try {
+			await api.patch(`/suppliers/staff/${managerId}`, {
+				email: data.email,
+				first_name: data.first_name,
+				last_name: data.last_name,
+				staff_role: data.role === 'manager' ? 'manager' : 'sales'
+			})
+		} catch (error) {
+			console.error('Failed to update staff member:', error)
+			throw error
+		}
 	}
 
 	async deleteManager(managerId: string): Promise<void> {
@@ -503,6 +558,15 @@ class DataService {
 			await api.patch(`/suppliers/staff/${staffId}/deactivate`)
 		} catch (error) {
 			console.error('Failed to deactivate staff member:', error)
+			throw error
+		}
+	}
+
+	async activateStaffMember(staffId: string): Promise<void> {
+		try {
+			await api.patch(`/suppliers/staff/${staffId}/activate`)
+		} catch (error) {
+			console.error('Failed to activate staff member:', error)
 			throw error
 		}
 	}

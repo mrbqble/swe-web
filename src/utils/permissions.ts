@@ -7,7 +7,6 @@ export type SupplierRole = 'supplier_owner' | 'supplier_manager' | 'supplier_sal
 
 export interface Permissions {
   // Pages
-  canAccessDashboard: boolean;
   canAccessLinkRequests: boolean;
   canAccessOrders: boolean;
   canAccessComplaints: boolean;
@@ -53,7 +52,6 @@ export function getPermissions(role: string): Permissions {
 
   return {
     // Pages - All supplier staff can access these
-    canAccessDashboard: isSupplierStaff,
     canAccessLinkRequests: isSupplierStaff, // All supplier staff can view link requests
     canAccessOrders: isSupplierStaff, // All supplier staff can view orders
     canAccessComplaints: isSupplierStaff, // All can view
