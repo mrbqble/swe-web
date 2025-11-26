@@ -63,7 +63,6 @@ const ComplaintDetail: React.FC<ComplaintDetailProps> = ({ complaintId, onClose,
 			}
 		} catch (error) {
 			console.error('Failed to load complaint:', error)
-			alert('Failed to load complaint details')
 		} finally {
 			setIsLoading(false)
 		}
@@ -71,14 +70,12 @@ const ComplaintDetail: React.FC<ComplaintDetailProps> = ({ complaintId, onClose,
 
 	const handleResolve = async () => {
 		if (!resolutionText.trim()) {
-			alert('Please enter a resolution text')
 			return
 		}
 
 		try {
 			setIsUpdating(true)
 			await dataService.updateComplaintStatus(parseInt(complaintId), 'resolved', resolutionText)
-			alert('Complaint resolved successfully')
 			await loadComplaint()
 			if (onStatusUpdate) {
 				onStatusUpdate()
@@ -86,28 +83,21 @@ const ComplaintDetail: React.FC<ComplaintDetailProps> = ({ complaintId, onClose,
 			setShowResolutionInput(false)
 		} catch (error: any) {
 			console.error('Failed to resolve complaint:', error)
-			alert(error?.response?.data?.detail || 'Failed to resolve complaint')
 		} finally {
 			setIsUpdating(false)
 		}
 	}
 
 	const handleEscalate = async () => {
-		if (!window.confirm('Are you sure you want to escalate this complaint to the manager?')) {
-			return
-		}
-
 		try {
 			setIsUpdating(true)
 			await dataService.updateComplaintStatus(parseInt(complaintId), 'escalated')
-			alert('Complaint escalated to manager successfully')
 			await loadComplaint()
 			if (onStatusUpdate) {
 				onStatusUpdate()
 			}
 		} catch (error: any) {
 			console.error('Failed to escalate complaint:', error)
-			alert(error?.response?.data?.detail || 'Failed to escalate complaint')
 		} finally {
 			setIsUpdating(false)
 		}
@@ -401,8 +391,6 @@ const ComplaintDetail: React.FC<ComplaintDetailProps> = ({ complaintId, onClose,
 								if ((window as any).navigateToChat) {
 									;(window as any).navigateToChat(Number(complaint.consumer_id))
 									onClose() // Close the detail modal
-								} else {
-									alert('Unable to open chat. Please try again.')
 								}
 							}}
 							style={{ color: '#007bff', borderColor: '#007bff' }}

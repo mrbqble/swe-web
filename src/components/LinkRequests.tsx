@@ -53,7 +53,6 @@ const LinkRequests: React.FC = () => {
 
   const handleApprove = async (linkId: string) => {
     if (!permissions.canApproveLinkRequests) {
-      alert('You do not have permission to approve link requests');
       return;
     }
     try {
@@ -61,13 +60,11 @@ const LinkRequests: React.FC = () => {
       loadLinkRequests(); // Reload the list
     } catch (error) {
       console.error('Failed to approve link request:', error);
-      alert('Failed to approve link request');
     }
   };
 
   const handleReject = async (linkId: string) => {
     if (!permissions.canRejectLinkRequests) {
-      alert('You do not have permission to reject link requests');
       return;
     }
     try {
@@ -75,7 +72,6 @@ const LinkRequests: React.FC = () => {
       loadLinkRequests(); // Reload the list
     } catch (error) {
       console.error('Failed to reject link request:', error);
-      alert('Failed to reject link request');
     }
   };
 

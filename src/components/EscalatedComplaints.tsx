@@ -88,7 +88,6 @@ const EscalatedComplaints: React.FC = () => {
       setComplaints(detailedComplaints);
     } catch (error) {
       console.error('Failed to load escalated complaints:', error);
-      alert('Failed to load escalated complaints');
       setComplaints([]);
     } finally {
       setIsLoading(false);
@@ -103,18 +102,11 @@ const EscalatedComplaints: React.FC = () => {
     if ((window as any).navigateToChat && complaint.consumer_id) {
       // Navigate to chat with the consumer_id
       (window as any).navigateToChat(Number(complaint.consumer_id));
-    } else {
-      alert('Unable to open chat. Please try again.');
     }
   };
 
   const handleResolve = async (complaint: EscalatedComplaintDetail) => {
     if (!resolutionText.trim()) {
-      alert('Please enter a resolution text');
-      return;
-    }
-
-    if (!window.confirm('Are you sure you want to resolve this complaint?')) {
       return;
     }
 
@@ -125,14 +117,12 @@ const EscalatedComplaints: React.FC = () => {
         'resolved',
         resolutionText,
       );
-      alert('Complaint resolved successfully');
       setShowResolutionInput(false);
       setResolutionText('');
       setSelectedComplaint(null);
       await loadEscalatedComplaints();
     } catch (error: any) {
       console.error('Failed to resolve complaint:', error);
-      alert(error?.response?.data?.detail || 'Failed to resolve complaint');
     } finally {
       setIsResolving(false);
     }

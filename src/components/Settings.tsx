@@ -108,7 +108,6 @@ const Settings: React.FC = () => {
 	const handleAddManager = async (e: React.FormEvent) => {
 		e.preventDefault()
 		if (!permissions.canManageTeam) {
-			alert('You do not have permission to manage team members')
 			return
 		}
 
@@ -123,7 +122,6 @@ const Settings: React.FC = () => {
 			loadData()
 		} catch (error: any) {
 			console.error('Failed to add manager:', error)
-			alert(error.message || 'Failed to add team member. Staff creation should be done via user registration.')
 		}
 	}
 
@@ -150,7 +148,6 @@ const Settings: React.FC = () => {
 			setProfileError(null)
 			await dataService.updateSupplierProfile(supplierProfile)
 			setIsEditingProfile(false)
-			alert('Supplier profile updated successfully')
 			loadData()
 		} catch (error: any) {
 			console.error('Failed to update supplier profile:', error)
@@ -164,7 +161,6 @@ const Settings: React.FC = () => {
 			setProfileError(null)
 			await dataService.updateUserProfile(userProfile)
 			setIsEditingUserProfile(false)
-			alert('Profile updated successfully')
 			loadData()
 		} catch (error: any) {
 			console.error('Failed to update user profile:', error)
@@ -176,25 +172,20 @@ const Settings: React.FC = () => {
 
 	const handleDeleteManager = async (id: string) => {
 		if (!permissions.canManageTeam) {
-			alert('You do not have permission to delete team members')
 			return
 		}
 
-		if (window.confirm('Are you sure you want to delete this team member?')) {
-			try {
-				await dataService.deleteManager(id)
-				setManagers(managers.filter((m) => m.id !== id))
-			} catch (error) {
-				console.error('Failed to delete manager:', error)
-				alert('Failed to delete team member')
-			}
+		try {
+			await dataService.deleteManager(id)
+			setManagers(managers.filter((m) => m.id !== id))
+		} catch (error) {
+			console.error('Failed to delete manager:', error)
 		}
 	}
 
 	const handleAddSupplier = async (e: React.FormEvent) => {
 		e.preventDefault()
 		if (!permissions.canManageSuppliers) {
-			alert('You do not have permission to manage suppliers')
 			return
 		}
 
@@ -204,7 +195,6 @@ const Settings: React.FC = () => {
 			setNewSupplier({ name: '', companyName: '', email: '', isActive: true })
 		} catch (error) {
 			console.error('Failed to add supplier:', error)
-			alert('Failed to add supplier')
 		}
 	}
 
@@ -657,12 +647,10 @@ const Settings: React.FC = () => {
 										email: editingManager.email,
 										role: editingManager.role
 									})
-									alert('Staff member updated successfully')
 									setEditingManager(null)
 									loadData()
 								} catch (error: any) {
 									console.error('Failed to update staff member:', error)
-									alert(error.response?.data?.detail || 'Failed to update staff member')
 								}
 							}}
 							style={{
@@ -839,15 +827,11 @@ const Settings: React.FC = () => {
 														<button
 															className="btn btn-outline"
 															onClick={async () => {
-																if (window.confirm(`Are you sure you want to deactivate ${manager.name}?`)) {
-																	try {
-																		await dataService.deactivateStaffMember(manager.id)
-																		alert('Staff member deactivated successfully')
-																		loadData()
-																	} catch (error) {
-																		console.error('Failed to deactivate staff:', error)
-																		alert('Failed to deactivate staff member')
-																	}
+																try {
+																	await dataService.deactivateStaffMember(manager.id)
+																	loadData()
+																} catch (error) {
+																	console.error('Failed to deactivate staff:', error)
 																}
 															}}
 															style={{
@@ -861,15 +845,11 @@ const Settings: React.FC = () => {
 														<button
 															className="btn btn-outline"
 															onClick={async () => {
-																if (window.confirm(`Are you sure you want to activate ${manager.name}?`)) {
-																	try {
-																		await dataService.activateStaffMember(manager.id)
-																		alert('Staff member activated successfully')
-																		loadData()
-																	} catch (error) {
-																		console.error('Failed to activate staff:', error)
-																		alert('Failed to activate staff member')
-																	}
+																try {
+																	await dataService.activateStaffMember(manager.id)
+																	loadData()
+																} catch (error) {
+																	console.error('Failed to activate staff:', error)
 																}
 															}}
 															style={{

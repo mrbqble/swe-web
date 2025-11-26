@@ -22,7 +22,6 @@ const LinkManagement: React.FC = () => {
 			setAllLinks(response.items)
 		} catch (error) {
 			console.error('Failed to load link requests:', error)
-			alert('Failed to load link requests')
 		} finally {
 			setIsLoading(false)
 		}
@@ -50,93 +49,66 @@ const LinkManagement: React.FC = () => {
 
 	const handleApprove = async (linkId: string) => {
 		if (!permissions.canApproveLinkRequests) {
-			alert('You do not have permission to approve link requests')
 			return
 		}
 		try {
 			await dataService.updateLinkStatus(parseInt(linkId), 'accepted')
-			alert('Link request approved successfully')
 			// Refresh the list
 			loadAllLinks()
 		} catch (error: any) {
 			console.error('Failed to approve link request:', error)
-			alert(error?.response?.data?.detail || 'Failed to approve link request')
 		}
 	}
 
 	const handleReject = async (linkId: string) => {
 		if (!permissions.canRejectLinkRequests) {
-			alert('You do not have permission to reject link requests')
-			return
-		}
-		if (!window.confirm('Are you sure you want to reject this link request?')) {
 			return
 		}
 		try {
 			await dataService.updateLinkStatus(parseInt(linkId), 'denied')
-			alert('Link request rejected successfully')
 			loadAllLinks()
 		} catch (error: any) {
 			console.error('Failed to reject link request:', error)
-			alert(error?.response?.data?.detail || 'Failed to reject link request')
 		}
 	}
 
 	const handleBlock = async (linkId: string) => {
 		if (!permissions.canBlockLinks) {
-			alert('You do not have permission to block links. Only owners and managers can block links.')
-			return
-		}
-		if (!window.confirm('Are you sure you want to block this consumer? They will no longer be able to place orders with you.')) {
 			return
 		}
 		try {
 			await dataService.blockLink(parseInt(linkId))
-			alert('Consumer blocked successfully')
 			// Refresh the list
 			loadAllLinks()
 		} catch (error: any) {
 			console.error('Failed to block link:', error)
-			alert(error?.response?.data?.detail || 'Failed to block link')
 		}
 	}
 
 	const handleUnblock = async (linkId: string) => {
 		if (!permissions.canBlockLinks) {
-			alert('You do not have permission to unblock consumers. Only owners and managers can unblock.')
-			return
-		}
-		if (!window.confirm('Are you sure you want to unblock this consumer? They will be able to place orders with you again.')) {
 			return
 		}
 		try {
 			await dataService.unblockLink(parseInt(linkId))
-			alert('Consumer unblocked successfully')
 			// Refresh the list
 			loadAllLinks()
 		} catch (error: any) {
 			console.error('Failed to unblock:', error)
-			alert(error?.response?.data?.detail || 'Failed to unblock consumer')
 		}
 	}
 
 	const handleUnlink = async (linkId: string) => {
 		if (!permissions.canBlockLinks) {
-			alert('You do not have permission to unlink consumers. Only owners and managers can unlink.')
-			return
-		}
-		if (!window.confirm('Are you sure you want to unlink this consumer? The link will be marked as unlinked.')) {
 			return
 		}
 		try {
 			// Unlink by setting the link status to unlinked
 			await dataService.unlinkConsumer(parseInt(linkId))
-			alert('Consumer unlinked successfully.')
 			// Refresh the list
 			loadAllLinks()
 		} catch (error: any) {
 			console.error('Failed to unlink:', error)
-			alert(error?.response?.data?.detail || 'Failed to unlink consumer')
 		}
 	}
 

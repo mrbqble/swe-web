@@ -37,14 +37,12 @@ const Complaints: React.FC = () => {
 	const handleStatusUpdate = async (complaintId: string, newStatus: string, resolution?: string) => {
 		try {
 			await dataService.updateComplaintStatus(parseInt(complaintId), newStatus, resolution)
-			alert(`Complaint ${newStatus === 'escalated' ? 'escalated' : 'resolved'} successfully`)
 			loadComplaints() // Reload to reflect changes
 			if (selectedComplaintId === complaintId) {
 				setSelectedComplaintId(null) // Close detail if open
 			}
 		} catch (error: any) {
 			console.error('Failed to update complaint status:', error)
-			alert(error?.response?.data?.detail || 'Failed to update complaint status')
 		}
 	}
 
@@ -229,8 +227,6 @@ const Complaints: React.FC = () => {
 														onClick={() => {
 															if ((window as any).navigateToChat) {
 																;(window as any).navigateToChat(Number(consumerId))
-															} else {
-																alert('Unable to open chat. Please try again.')
 															}
 														}}
 														style={{

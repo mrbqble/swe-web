@@ -66,31 +66,21 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ orderId, onClose, onStatusUpd
 			setOrder(response)
 		} catch (error) {
 			console.error('Failed to load order:', error)
-			alert('Failed to load order details')
 		} finally {
 			setIsLoading(false)
 		}
 	}
 
 	const handleStatusUpdate = async (newStatus: string) => {
-		if (newStatus === 'rejected' && !window.confirm('Are you sure you want to reject this order? This action cannot be undone.')) {
-			return
-		}
-
 		try {
 			setIsUpdating(true)
 			await dataService.updateOrderStatus(parseInt(orderId), newStatus)
-			alert(`Order ${newStatus === 'rejected' ? 'rejected' : 'status updated'} successfully`)
 			await loadOrder()
 			if (onStatusUpdate) {
 				onStatusUpdate()
 			}
 		} catch (error: any) {
 			console.error('Failed to update order status:', error)
-			alert(
-				error?.response?.data?.detail ||
-					'Failed to update order status. ' + (error?.response?.data?.detail?.includes('stock') ? error.response.data.detail : '')
-			)
 		} finally {
 			setIsUpdating(false)
 		}
@@ -405,6 +395,16 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ orderId, onClose, onStatusUpd
 								{isUpdating ? t('common.loading') : t('orderDetail.markAsCompleted')}
 							</button>
 						)}
+						{order.status === 'rejected' && permissions.canAcceptOrders && (
+							<button
+								className="btn btn-primary"
+								onClick={() => handleStatusUpdate('accepted')}
+								disabled={isUpdating}
+								aria-label={t('orderDetail.acceptOrder')}
+							>
+								{isUpdating ? t('common.loading') : `✓ ${t('orderDetail.acceptOrder')}`}
+							</button>
+						)}
 						<button
 							className="btn btn-outline"
 							onClick={() => {
@@ -415,11 +415,7 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ orderId, onClose, onStatusUpd
 									if (navigateToChat && typeof navigateToChat === 'function') {
 										navigateToChat(consumerId)
 										onClose() // Close order detail when navigating to chat
-									} else {
-										alert('Unable to open chat. Please navigate to the Chat page manually.')
 									}
-								} else {
-									alert('Consumer information not available for this order.')
 								}
 							}}
 							aria-label={t('orderDetail.openChat')}

@@ -41,17 +41,12 @@ const Orders: React.FC = () => {
 	const handleStatusUpdate = async (orderId: string, newStatus: string) => {
 		try {
 			await dataService.updateOrderStatus(parseInt(orderId), newStatus)
-			alert(`Order ${newStatus === 'rejected' ? 'rejected' : 'status updated'} successfully`)
 			loadOrders() // Reload to reflect changes
 			if (selectedOrderId === orderId) {
 				setSelectedOrderId(null) // Close detail if open
 			}
 		} catch (error: any) {
 			console.error('Failed to update order status:', error)
-			alert(
-				error?.response?.data?.detail ||
-					'Failed to update order status. ' + (error?.response?.data?.detail?.includes('stock') ? error.response.data.detail : '')
-			)
 		}
 	}
 
@@ -267,6 +262,16 @@ const Orders: React.FC = () => {
 												aria-label={t('orders.complete')}
 											>
 												{t('orders.complete')}
+											</button>
+										)}
+										{order.status === 'rejected' && permissions.canAcceptOrders && (
+											<button
+												className="btn btn-primary"
+												onClick={() => handleStatusUpdate(order.id, 'accepted')}
+												style={{ fontSize: '12px', padding: '4px 8px' }}
+												aria-label={t('orders.accept')}
+											>
+												{t('orders.accept')}
 											</button>
 										)}
 									</div>

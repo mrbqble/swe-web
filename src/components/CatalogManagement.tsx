@@ -61,7 +61,6 @@ const CatalogManagement: React.FC = () => {
       setTotalPages(response.pages || 1);
     } catch (error) {
       console.error('Failed to load products:', error);
-      alert('Failed to load products');
     } finally {
       setIsLoading(false);
     }
@@ -134,34 +133,23 @@ const CatalogManagement: React.FC = () => {
 
       if (editingProduct) {
         await dataService.updateProduct(parseInt(editingProduct.id), productData);
-        alert('Product updated successfully');
       } else {
         await dataService.createProduct(productData);
-        alert('Product created successfully');
       }
 
       setShowProductForm(false);
       loadProducts();
     } catch (error: any) {
       console.error('Failed to save product:', error);
-      alert(error?.response?.data?.detail || 'Failed to save product');
     }
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    if (
-      window.confirm(
-        'Are you sure you want to delete this product? This action cannot be undone.',
-      )
-    ) {
-      try {
-        await dataService.deleteProduct(parseInt(productId));
-        alert('Product deleted successfully');
-        loadProducts();
-      } catch (error) {
-        console.error('Failed to delete product:', error);
-        alert('Failed to delete product');
-      }
+    try {
+      await dataService.deleteProduct(parseInt(productId));
+      loadProducts();
+    } catch (error) {
+      console.error('Failed to delete product:', error);
     }
   };
 
@@ -170,11 +158,9 @@ const CatalogManagement: React.FC = () => {
       await dataService.updateProduct(parseInt(product.id), {
         is_active: !product.is_active,
       });
-      alert(`Product ${product.is_active ? 'deactivated' : 'activated'} successfully`);
       loadProducts();
     } catch (error) {
       console.error('Failed to update product:', error);
-      alert('Failed to update product status');
     }
   };
 

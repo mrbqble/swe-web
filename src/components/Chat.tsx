@@ -79,11 +79,9 @@ const Chat: React.FC<ChatProps> = ({ consumerId, onContextClear }) => {
 	const sendMessage = async () => {
 		if (!newMessage.trim() || !selectedSession) return
 		if (!user?.id) {
-			alert('You must be logged in to send messages')
 			return
 		}
 		if (!permissions.canSendMessages) {
-			alert('You do not have permission to send messages')
 			return
 		}
 
@@ -111,7 +109,6 @@ const Chat: React.FC<ChatProps> = ({ consumerId, onContextClear }) => {
 			await loadMessages(selectedSession.id)
 		} catch (error) {
 			console.error('Failed to send message:', error)
-			alert('Failed to send message')
 			// Remove optimistic message on error
 			setMessages((prev) => prev.filter((msg) => msg.id !== messageData.id))
 		}
