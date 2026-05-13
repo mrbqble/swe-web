@@ -1,328 +1,172 @@
 import React, { useState } from 'react'
+import { Navigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from './AuthContext'
-import { useLanguage } from '../hooks/useLanguage'
-import { t } from '../utils/i18n'
-import { authService } from '../services/authService'
-import { showErrorToast } from '../services/toast'
 
 const Login: React.FC = () => {
-	const [email, setEmail] = useState('')
-	const [password, setPassword] = useState('')
-	const [firstName, setFirstName] = useState('')
-	const [lastName, setLastName] = useState('')
-	const [companyName, setCompanyName] = useState('')
-	const [error, setError] = useState(false)
-	const [emailError, setEmailError] = useState(false)
-	const [isSignup, setIsSignup] = useState(false)
-	const [showPassword, setShowPassword] = useState(false)
-	const [isResetMode, setIsResetMode] = useState(false)
-	const [resetSuccess, setResetSuccess] = useState(false)
-	const { login, signup, isLoading } = useAuth()
-	const { language, changeLanguage } = useLanguage()
+  const { admin, isLoading, login } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-	const validateEmail = (value: string) => /\S+@\S+\.\S+/.test(value)
-	const validatePassword = (value: string) => value.length >= 8 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /[0-9_!@#$%^&*()\-+=]/.test(value)
+  if (!isLoading && admin) return <Navigate to="/" replace />
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault()
-		setError(false)
-		setEmailError(false)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      await login(email, password)
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Неверный email или пароль')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
-		if (!validateEmail(email)) {
-			setEmailError(true)
-			return
-		}
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#F9FAFB',
+        fontFamily: 'sans-serif',
+      }}
+    >
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 12,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+          padding: '40px 36px',
+          width: 360,
+        }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: '#1A3C6E',
+              letterSpacing: -0.5,
+            }}
+          >
+            iCare Admin
+          </div>
+          <p style={{ color: '#6B7280', marginTop: 6, fontSize: 14 }}>
+            Панель управления
+          </p>
+        </div>
 
-		if (isResetMode) {
-			// Forgot password flow
-			if (!validatePassword(password)) {
-				setError(true)
-				return
-			}
-			try {
-				setError(false)
-				setResetSuccess(false)
-				await authService.resetPassword(email, password)
-				setResetSuccess(true)
-				showErrorToast(t('auth.passwordResetSuccess', language) || 'Password reset successfully')
-				setIsResetMode(false)
-				setPassword('')
-			} catch (err: any) {
-				setError(true)
-				const detail = err?.response?.data?.detail || t('auth.passwordResetFailed', language) || 'Failed to reset password'
-				showErrorToast(detail)
-			}
-		} else {
-			let success = false
-			if (isSignup) {
-				// Validate required fields for signup
-				if (!firstName.trim() || !lastName.trim()) {
-					setError(true)
-					return
-				}
-				if (!companyName.trim()) {
-					setError(true)
-					return
-				}
-				// Web app always signs up as supplier_owner
-				success = await signup(email, password, firstName, lastName, 'supplier_owner', companyName.trim())
-			} else {
-				success = await login(email, password)
-			}
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: '#374151' }}>
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={submitting}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: 8,
+                fontSize: 14,
+                boxSizing: 'border-box',
+                outline: 'none',
+              }}
+            />
+          </div>
 
-			if (!success) {
-				setError(true)
-				showErrorToast(
-					isSignup ? t('auth.signupFailed', language) : t('auth.loginFailed', language)
-				)
-			}
-		}
-	}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: '#374151' }}>
+              Пароль
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPw ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={submitting}
+                style={{
+                  width: '100%',
+                  padding: '9px 40px 9px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((p) => !p)}
+                style={{
+                  position: 'absolute',
+                  right: 10,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#9CA3AF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: 0,
+                }}
+              >
+                {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
 
-	// Reset form when switching between login/signup
-	const handleToggleSignup = () => {
-		setIsSignup(!isSignup)
-		setIsResetMode(false)
-		setError(false)
-		setFirstName('')
-		setLastName('')
-		setCompanyName('')
-		setEmailError(false)
-	}
+          {error && (
+            <div
+              style={{
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: 6,
+                padding: '8px 12px',
+                color: '#DC2626',
+                fontSize: 13,
+                marginBottom: 16,
+              }}
+            >
+              {error}
+            </div>
+          )}
 
-	return (
-		<div className="login-container">
-			<div className="login-card">
-				<div className="login-header">
-					<h1>SupplyKZ</h1>
-					<p>
-						{isResetMode
-							? t('auth.resetPasswordSubtitle', language) || 'Reset your password'
-							: isSignup
-							? t('auth.signUpSubtitle', language)
-							: t('auth.signInSubtitle', language)}
-					</p>
-					<div style={{ marginTop: '12px' }}>
-						<label
-							style={{
-								fontSize: '12px',
-								color: '#666',
-								display: 'block',
-								marginBottom: '4px'
-							}}
-						>
-							{t('settings.language', language)}
-						</label>
-						<select
-							value={language}
-							onChange={(e) => changeLanguage(e.target.value as any)}
-							style={{
-								width: '100%',
-								padding: '6px 8px',
-								borderRadius: '4px',
-								border: '1px solid #ddd',
-								fontSize: '12px'
-							}}
-						>
-							<option value="en">{t('settings.english', language)}</option>
-							<option value="ru">{t('settings.russian', language)}</option>
-						</select>
-					</div>
-				</div>
-
-				<form
-					onSubmit={handleSubmit}
-					className="login-form"
-				>
-					{error && <div className="error-message">{isSignup ? t('auth.signupFailed', language) : t('auth.loginFailed', language)}</div>}
-
-					{isSignup && !isResetMode && (
-						<>
-							<div className="form-group">
-								<label htmlFor="firstName">
-									{t('auth.firstName', language)}
-									<span className="required-indicator">*</span>
-								</label>
-								<input
-									type="text"
-									id="firstName"
-									value={firstName}
-									onChange={(e) => setFirstName(e.target.value)}
-									required
-									disabled={isLoading}
-									minLength={1}
-									maxLength={100}
-								/>
-							</div>
-
-							<div className="form-group">
-								<label htmlFor="lastName">
-									{t('auth.lastName', language)}
-									<span className="required-indicator">*</span>
-								</label>
-								<input
-									type="text"
-									id="lastName"
-									value={lastName}
-									onChange={(e) => setLastName(e.target.value)}
-									required
-									disabled={isLoading}
-									minLength={1}
-									maxLength={100}
-								/>
-							</div>
-
-							<div className="form-group">
-								<label htmlFor="companyName">
-									{t('auth.companyName', language)}
-									<span className="required-indicator">*</span>
-								</label>
-								<input
-									type="text"
-									id="companyName"
-									value={companyName}
-									onChange={(e) => setCompanyName(e.target.value)}
-									required
-									disabled={isLoading}
-								/>
-							</div>
-						</>
-					)}
-
-					<div className="form-group">
-						<label htmlFor="email">
-							{t('auth.email', language)}
-							<span className="required-indicator">*</span>
-						</label>
-						<input
-							type="email"
-							id="email"
-							value={email}
-							onChange={(e) => {
-								const value = e.target.value
-								setEmail(value)
-								if (!validateEmail(value)) {
-									setEmailError(true)
-								} else {
-									setEmailError(false)
-								}
-							}}
-							required
-							disabled={isLoading}
-						/>
-						{emailError && <small className="field-error">{t('auth.invalidEmail', language)}</small>}
-					</div>
-
-					<div className="form-group">
-						<label htmlFor="password">
-							{isResetMode ? t('auth.newPassword', language) || 'New Password' : t('auth.password', language)}
-							<span className="required-indicator">*</span>
-						</label>
-						<div className="password-input-wrapper">
-							<input
-								type={showPassword ? 'text' : 'password'}
-								id="password"
-								value={password}
-								onChange={(e) => {
-									const value = e.target.value
-									setPassword(value)
-								}}
-								required
-								disabled={isLoading}
-								minLength={8}
-								className="password-input"
-							/>
-							<button
-								type="button"
-								className="toggle-password-visibility icon-button"
-								onClick={() => setShowPassword((prev) => !prev)}
-								disabled={isLoading}
-								aria-label={showPassword ? t('auth.hidePassword', language) : t('auth.showPassword', language)}
-							>
-								<span className="eye-icon">{showPassword ? '🙈' : '👁️'}</span>
-							</button>
-						</div>
-						{(isSignup || isResetMode) && (
-							<div className="password-requirements">
-								<div className={password.length >= 8 ? 'password-check password-check-ok' : 'password-check'}>
-									<span className="password-check-icon">{password.length >= 8 ? '✓' : '✕'}</span>
-									<span>{t('auth.passwordMinLength', language)}</span>
-								</div>
-								<div className={/[A-Z]/.test(password) ? 'password-check password-check-ok' : 'password-check'}>
-									<span className="password-check-icon">{/[A-Z]/.test(password) ? '✓' : '✕'}</span>
-									<span>{t('auth.passwordUpper', language)}</span>
-								</div>
-								<div className={/[a-z]/.test(password) ? 'password-check password-check-ok' : 'password-check'}>
-									<span className="password-check-icon">{/[a-z]/.test(password) ? '✓' : '✕'}</span>
-									<span>{t('auth.passwordLower', language)}</span>
-								</div>
-								<div className={/[0-9_!@#$%^&*()\-+=]/.test(password) ? 'password-check password-check-ok' : 'password-check'}>
-									<span className="password-check-icon">{/[0-9_!@#$%^&*()\-+=]/.test(password) ? '✓' : '✕'}</span>
-									<span>{t('auth.passwordDigitOrSymbol', language)}</span>
-								</div>
-							</div>
-						)}
-					</div>
-
-					<button
-						type="submit"
-						className="login-button"
-						disabled={
-							isLoading ||
-							!validateEmail(email) ||
-							(isResetMode
-								? !validatePassword(password)
-								: isSignup
-								? !validatePassword(password) || firstName.trim().length === 0 || lastName.trim().length === 0 || companyName.trim().length === 0
-								: password.trim().length === 0)
-						}
-					>
-						{isLoading
-							? isResetMode
-								? t('auth.resetPassword', language) || 'Reset Password'
-								: isSignup
-								? t('auth.signup', language)
-								: t('auth.signIn', language)
-							: isResetMode
-							? t('auth.resetPassword', language) || 'Reset Password'
-							: isSignup
-							? t('auth.signup', language)
-							: t('auth.signIn', language)}
-					</button>
-				</form>
-
-				<div className="auth-switch">
-					<button
-						type="button"
-						onClick={() => {
-							setIsResetMode(true)
-							setIsSignup(false)
-							setError(false)
-							setResetSuccess(false)
-						}}
-						className="switch-button"
-					>
-						{t('auth.forgotPassword', language) || 'Forgot password?'}
-					</button>
-					{resetSuccess && (
-						<div className="success-message">
-							{t('auth.passwordResetSuccess', language) || 'Password reset successfully. You can now log in with your new password.'}
-						</div>
-					)}
-				</div>
-
-				<div className="auth-switch">
-					<button
-						type="button"
-						onClick={handleToggleSignup}
-						className="switch-button"
-					>
-						{isSignup ? t('auth.login', language) : t('auth.signup', language)}
-					</button>
-				</div>
-			</div>
-		</div>
-	)
+          <button
+            type="submit"
+            disabled={submitting || !email || !password}
+            style={{
+              width: '100%',
+              padding: '10px 0',
+              background: submitting || !email || !password ? '#93C5FD' : '#1A3C6E',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: submitting || !email || !password ? 'not-allowed' : 'pointer',
+              transition: 'background 0.15s',
+            }}
+          >
+            {submitting ? 'Вход...' : 'Войти'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 export default Login

@@ -1,108 +1,156 @@
-// types/index.ts
-// Note: User interface is now defined in utils/userUtils.ts
-// Import it from there: import { User } from '../utils/userUtils';
+export interface AdminUser {
+  id: number
+  email: string
+  name: string
+}
+
+export interface PartnerListParams {
+  page?: number
+  limit?: number
+  search?: string
+  city?: string
+  status_tier?: string
+  is_active?: boolean
+  is_frozen?: boolean
+}
+
+export interface PartnerUpdate {
+  status_tier: string
+  city: string
+  is_active: boolean
+  is_frozen: boolean
+}
+
+export interface OrderListParams {
+  page?: number
+  limit?: number
+  status?: string
+  date_from?: string
+  date_to?: string
+  search?: string
+}
+
+export interface FaqCreate {
+  question_ru: string
+  question_kz?: string
+  answer_ru: string
+  answer_kz?: string
+  sort_order?: number
+  is_published?: boolean
+}
+
+export interface BroadcastData {
+  title: string
+  body: string
+  audience: 'all' | 'city' | 'date_range'
+  city?: string
+  date_from?: string
+  date_to?: string
+}
+
+export interface AuditParams {
+  page?: number
+  limit?: number
+  admin_id?: number
+  target_type?: string
+  date_from?: string
+  date_to?: string
+}
+
+export interface Partner {
+  id: number
+  first_name: string
+  last_name: string
+  middle_name?: string
+  phone: string
+  email: string
+  email_verified: boolean
+  ref_code: string
+  city?: string
+  status_tier: string
+  is_active: boolean
+  is_frozen: boolean
+  created_at: string
+  sponsor?: {
+    id: number
+    first_name: string
+    last_name: string
+    phone: string
+    ref_code: string
+  }
+  ip_too?: {
+    id: number
+    type: string
+    status: string
+    iin_bin: string
+    submitted_at: string
+    rejection_reason?: string
+  }
+  downline_count?: number
+  sessions?: Array<{
+    device?: string
+    ip?: string
+    last_active: string
+  }>
+}
+
+export interface IpTooItem {
+  id: number
+  partner_id: number
+  partner_name: string
+  partner_phone: string
+  type: 'ИП' | 'ТОО'
+  iin_bin: string
+  submitted_at: string
+}
 
 export interface Order {
-	id: string
-	orderNumber: string
-	customer: string
-	organization: string
-	date: string
-	amount: string
-	status: string
-	items: number
-	backendData?: any
+  id: number
+  partner_name?: string
+  partner_phone?: string
+  blocks: number
+  amount: number
+  status: string
+  payment_status?: string
+  created_at: string
 }
 
-export interface Complaint {
-	id: string
-	complaintNumber: string
-	customer: string
-	organization: string
-	subject: string
-	priority: 'high' | 'medium' | 'low'
-	status: string
-	updated: string
-	orderNumber: string
-	issueType: string
-	backendData?: any
-	consumer?: {
-		id: number
-		name: string
-		email: string
-		organization_name: string
-	}
+export interface InventoryItem {
+  product_id: number
+  sku: string
+  name: string
+  size?: string
+  stock_qty: number
+  is_active: boolean
 }
 
-export interface LinkRequest {
-	id: string
-	requester: string
-	email: string
-	organization: string
-	message: string
-	date: string
-	status: string
-	backendData?: any
+export interface FaqItem {
+  id: number
+  question_ru: string
+  question_kz?: string
+  answer_ru: string
+  answer_kz?: string
+  sort_order: number
+  is_published: boolean
 }
 
-export interface ChatSession {
-	id: string
-	consumerName: string
-	salesRepName: string
-	lastMessage: string
-	timestamp: string
-	unread: boolean
-	orderId?: string
-	backendData?: any
+export interface Suggestion {
+  id: number
+  partner_phone?: string
+  partner_name?: string
+  text: string
+  created_at: string
+  is_read: boolean
 }
 
-export interface ChatMessage {
-	id: string
-	sessionId: string
-	senderId: string
-	senderName: string
-	text: string
-	timestamp: string
-	isOwn: boolean
-	fileUrl?: string
-	backendData?: any
-}
-
-export interface Activity {
-	id: string
-	initials: string
-	content: string
-	time: string
-}
-
-export interface Manager {
-	id: string
-	name: string
-	email: string
-	role: 'manager' | 'sales'
-	created: string
-	isActive: boolean
-}
-
-export interface Supplier {
-	id: string
-	name: string
-	companyName: string
-	email: string
-	isActive: boolean
-	created: string
-}
-
-export interface Product {
-	id: string
-	name: string
-	description: string
-	price: string
-	currency: string
-	sku: string
-	stockQty: number
-	isActive: boolean
-	supplierId: string
-	created: string
-	backendData?: any
+export interface AuditEntry {
+  id: number
+  admin_id: number
+  admin_name?: string
+  action: string
+  target_type?: string
+  target_id?: number
+  before_data?: Record<string, unknown>
+  after_data?: Record<string, unknown>
+  created_at: string
 }

@@ -1,77 +1,91 @@
 import axios from 'axios'
-import { getAccessToken, getRefreshToken, setTokens, clearTokens } from './token'
-import { showErrorToast } from './toast'
+import { token } from './token'
+import type {
+  PartnerListParams,
+  PartnerUpdate,
+  OrderListParams,
+  FaqCreate,
+  BroadcastData,
+  AuditParams,
+} from '../types'
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000/api/v1'
-
-export const api = axios.create({
-	baseURL: API_BASE_URL,
-	headers: {
-		'Content-Type': 'application/json',
-		'X-Client-Type': 'web' // Identify web client for backend role restrictions
-	}
+const instance = axios.create({
+  baseURL: process.env.REACT_APP_API_URL ?? 'http://localhost:8000/api/v1',
+  headers: { 'Content-Type': 'application/json' },
 })
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-	(config) => {
-		const token = getAccessToken()
-		if (token) {
-			config.headers.Authorization = `Bearer ${token}`
-		}
-		return config
-	},
-	(error) => {
-		return Promise.reject(error)
-	}
+instance.interceptors.request.use((config) => {
+  const t = token.get()
+  if (t) config.headers.Authorization = `Bearer ${t}`
+  return config
+})
+
+instance.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (error.response?.status === 401) {
+      token.clear()
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
 )
 
-// Response interceptor to handle token refresh and errors
-api.interceptors.response.use(
-	(response) => response,
-	async (error) => {
-		const originalRequest = error.config
-
-		const url: string = originalRequest?.url || ''
-		const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/signup') || url.includes('/auth/refresh')
-
-		if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
-			originalRequest._retry = true
-
-			try {
-				const refreshToken = getRefreshToken()
-				if (refreshToken) {
-					// Use axios directly (not api instance) to avoid interceptor loop
-					const response = await axios.post(
-						`${API_BASE_URL}/auth/refresh`,
-						{
-							refresh_token: refreshToken
-						},
-						{
-							headers: {
-								'Content-Type': 'application/json',
-								'X-Client-Type': 'web' // Identify web client for backend role restrictions
-							}
-						}
-					)
-
-					const { access_token, refresh_token: newRefreshToken } = response.data
-					setTokens(access_token, newRefreshToken)
-
-					originalRequest.headers.Authorization = `Bearer ${access_token}`
-					return api(originalRequest)
-				}
-			} catch (refreshError) {
-				// Refresh failed, logout user
-				console.error('Token refresh failed:', refreshError)
-				clearTokens()
-				localStorage.removeItem('user')
-				showErrorToast('Session expired. Please login again.')
-				// Reload page to trigger login screen
-				window.location.reload()
-			}
-		}
-
-		return Promise.reject(error)
-	}
-)
+export const api = {
+  auth: {
+    login: (email: string, password: string) =>
+      instance.post('/admin/auth/login', { email, password }),
+    me: () => instance.get('/admin/auth/me'),
+  },
+  partners: {
+    list: (params: PartnerListParams) =>
+      instance.get('/admin/partners', { params }),
+    get: (id: number) => instance.get(`/admin/partners/${id}`),
+    update: (id: number, data: Partial<PartnerUpdate>) =>
+      instance.patch(`/admin/partners/${id}`, data),
+    forceVerifyEmail: (id: number) =>
+      instance.post(`/admin/partners/${id}/force-verify-email`),
+    resetPassword: (id: number) =>
+      instance.post(`/admin/partners/${id}/reset-password`),
+  },
+  ipToo: {
+    pending: () => instance.get('/admin/ip-too/pending'),
+    verify: (id: number, action: 'approve' | 'reject', reason?: string) =>
+      instance.patch(`/admin/ip-too/${id}/verify`, { action, rejection_reason: reason }),
+  },
+  orders: {
+    list: (params: OrderListParams) =>
+      instance.get('/admin/orders', { params }),
+    updateStatus: (id: number, status: string) =>
+      instance.patch(`/admin/orders/${id}/status`, { status }),
+  },
+  inventory: {
+    list: () => instance.get('/admin/inventory'),
+    update: (productId: number, data: { stock_qty?: number; is_active?: boolean }) =>
+      instance.patch(`/admin/inventory/${productId}`, data),
+    import: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return instance.post('/admin/inventory/import', form)
+    },
+  },
+  faq: {
+    list: () => instance.get('/admin/faq'),
+    create: (data: FaqCreate) => instance.post('/admin/faq', data),
+    update: (id: number, data: Partial<FaqCreate>) =>
+      instance.patch(`/admin/faq/${id}`, data),
+    delete: (id: number) => instance.delete(`/admin/faq/${id}`),
+  },
+  notifications: {
+    broadcast: (data: BroadcastData) =>
+      instance.post('/admin/notifications/broadcast', data),
+  },
+  suggestions: {
+    list: (params: { page?: number; limit?: number; is_read?: boolean }) =>
+      instance.get('/admin/suggestions', { params }),
+    markRead: (id: number) => instance.patch(`/admin/suggestions/${id}/read`),
+  },
+  audit: {
+    list: (params: AuditParams) => instance.get('/admin/audit', { params }),
+  },
+}
