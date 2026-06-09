@@ -4,21 +4,20 @@ export interface AdminUser {
   name: string
 }
 
+export type AccountState = 'email_unconfirmed' | 'active' | 'soft_deleting' | 'blocked' | 'deleted'
+
 export interface PartnerListParams {
   page?: number
   limit?: number
   search?: string
   city?: string
   status_tier?: string
-  is_active?: boolean
-  is_frozen?: boolean
+  account_state?: AccountState | ''
 }
 
 export interface PartnerUpdate {
-  status_tier: string
-  city: string
-  is_active: boolean
-  is_frozen: boolean
+  status_tier?: string
+  city?: string
 }
 
 export interface OrderListParams {
@@ -53,6 +52,7 @@ export interface AuditParams {
   limit?: number
   admin_id?: number
   target_type?: string
+  action_type?: string
   date_from?: string
   date_to?: string
 }
@@ -66,10 +66,15 @@ export interface Partner {
   email: string
   email_verified: boolean
   ref_code: string
+  ref_code_changed: boolean
   city?: string
   status_tier: string
-  is_active: boolean
-  is_frozen: boolean
+  account_state: AccountState
+  welcomed: boolean
+  deletion_scheduled_at?: string | null
+  language?: string
+  consent_version?: string
+  consent_recorded_at?: string | null
   created_at: string
   sponsor?: {
     id: number
@@ -94,6 +99,14 @@ export interface Partner {
   }>
 }
 
+export interface RefCodeHistoryEntry {
+  id: number
+  user_id: number
+  old_ref_code: string
+  new_ref_code: string
+  changed_at: string
+}
+
 export interface IpTooItem {
   id: number
   partner_id: number
@@ -116,7 +129,7 @@ export interface Order {
 }
 
 export interface InventoryItem {
-  product_id: number
+  id: number
   sku: string
   name: string
   size?: string

@@ -25,13 +25,13 @@ const InventoryPage: React.FC = () => {
     const qty = parseInt(value, 10)
     if (isNaN(qty)) { setEditingStock(null); return }
     await api.inventory.update(id, { stock_qty: qty })
-    setItems((prev) => prev.map((item) => item.product_id === id ? { ...item, stock_qty: qty } : item))
+    setItems((prev) => prev.map((item) => item.id === id ? { ...item, stock_qty: qty } : item))
     setEditingStock(null)
   }
 
   const toggleActive = async (id: number, current: boolean) => {
     await api.inventory.update(id, { is_active: !current })
-    setItems((prev) => prev.map((item) => item.product_id === id ? { ...item, is_active: !current } : item))
+    setItems((prev) => prev.map((item) => item.id === id ? { ...item, is_active: !current } : item))
   }
 
   const handleImport = async () => {
@@ -102,26 +102,26 @@ const InventoryPage: React.FC = () => {
             ) : items.length === 0 ? (
               <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Нет данных</td></tr>
             ) : items.map((item) => (
-              <tr key={item.product_id} style={{ borderTop: '1px solid #F3F4F6' }}>
+              <tr key={item.id} style={{ borderTop: '1px solid #F3F4F6' }}>
                 <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: 12 }}>{item.sku}</td>
                 <td style={{ padding: '10px 14px', fontWeight: 500 }}>{item.name}</td>
                 <td style={{ padding: '10px 14px', color: '#6B7280' }}>{item.size ?? '—'}</td>
                 <td style={{ padding: '10px 14px' }}>
-                  {editingStock?.id === item.product_id ? (
+                  {editingStock?.id === item.id ? (
                     <span>
                       <input
                         type="number"
                         value={editingStock.value}
-                        onChange={(e) => setEditingStock({ id: item.product_id, value: e.target.value })}
-                        onBlur={() => saveStock(item.product_id, editingStock.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') saveStock(item.product_id, editingStock.value); if (e.key === 'Escape') setEditingStock(null) }}
+                        onChange={(e) => setEditingStock({ id: item.id, value: e.target.value })}
+                        onBlur={() => saveStock(item.id, editingStock.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveStock(item.id, editingStock.value); if (e.key === 'Escape') setEditingStock(null) }}
                         autoFocus
                         style={{ width: 80, padding: '3px 8px', border: '1px solid #D1D5DB', borderRadius: 4, fontSize: 13 }}
                       />
                     </span>
                   ) : (
                     <span
-                      onClick={() => setEditingStock({ id: item.product_id, value: String(item.stock_qty) })}
+                      onClick={() => setEditingStock({ id: item.id, value: String(item.stock_qty) })}
                       style={{ cursor: 'pointer', borderBottom: '1px dashed #D1D5DB', paddingBottom: 1 }}
                     >
                       {item.stock_qty}
@@ -132,7 +132,7 @@ const InventoryPage: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={item.is_active}
-                    onChange={() => toggleActive(item.product_id, item.is_active)}
+                    onChange={() => toggleActive(item.id, item.is_active)}
                     style={{ cursor: 'pointer', width: 16, height: 16 }}
                   />
                 </td>

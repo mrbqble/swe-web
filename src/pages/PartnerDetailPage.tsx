@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import { showToast } from '../services/toast'
-import type { Partner } from '../types'
+import type { Partner, RefCodeHistoryEntry } from '../types'
 
 const tierLabel: Record<string, string> = {
   partner: 'Партнёр',
@@ -14,6 +14,26 @@ const tierColor: Record<string, string> = {
   partner: '#6B7280', expert: '#2563EB', leader: '#7C3AED', top_partner: '#D97706',
 }
 const TIERS = ['partner', 'expert', 'leader', 'top_partner']
+
+const stateLabel: Record<string, string> = {
+  email_unconfirmed: 'Email не подтверждён',
+  active: 'Активен',
+  soft_deleting: 'Ожидает удаления',
+  blocked: 'Заблокирован',
+  deleted: 'Удалён',
+}
+const stateColor: Record<string, string> = {
+  email_unconfirmed: '#D97706',
+  active: '#059669',
+  soft_deleting: '#EA580C',
+  blocked: '#DC2626',
+  deleted: '#6B7280',
+}
+
+const languageLabel: Record<string, string> = {
+  ru: 'Русский',
+  kk: 'Казахский',
+}
 
 const Badge: React.FC<{ label: string; color: string }> = ({ label, color }) => (
   <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: color + '22', color }}>
@@ -28,31 +48,86 @@ const Field: React.FC<{ label: string; value: React.ReactNode }> = ({ label, val
   </div>
 )
 
-const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, padding: 20, marginBottom: 20 }}>
-    <h3 style={{ margin: '0 0 16px', fontSize: 15, color: '#1A3C6E' }}>{title}</h3>
+const Card: React.FC<{ title: string; children: React.ReactNode; borderColor?: string }> = ({ title, children, borderColor }) => (
+  <div style={{ background: '#fff', border: `1px solid ${borderColor ?? '#E5E7EB'}`, borderRadius: 8, padding: 20, marginBottom: 20 }}>
+    {title && <h3 style={{ margin: '0 0 16px', fontSize: 15, color: '#1A3C6E' }}>{title}</h3>}
     {children}
   </div>
 )
 
-type EditField = 'status_tier' | 'city' | 'is_active' | 'is_frozen' | null
+type ModalKind =
+  | { type: 'block' }
+  | { type: 'unblock' }
+  | { type: 'cancel_deletion' }
+  | { type: 'force_delete_1' }
+  | { type: 'force_delete_2' }
+  | null
+
+const ConfirmModal: React.FC<{
+  title: string
+  body: string
+  confirmLabel: string
+  onConfirm: () => void
+  onCancel: () => void
+  danger?: boolean
+}> = ({ title, body, confirmLabel, onConfirm, onCancel, danger }) => (
+  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+    <div style={{ background: '#fff', borderRadius: 12, padding: 32, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+      <h3 style={{ marginTop: 0, color: danger ? '#DC2626' : '#111827' }}>{title}</h3>
+      <p style={{ color: '#374151', marginBottom: 28, lineHeight: 1.6 }}>{body}</p>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <button
+          onClick={onCancel}
+          style={{ padding: '8px 20px', border: '1px solid #D1D5DB', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 13 }}
+        >
+          Отмена
+        </button>
+        <button
+          onClick={onConfirm}
+          style={{ padding: '8px 20px', border: 'none', borderRadius: 6, background: danger ? '#DC2626' : '#1A3C6E', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+        >
+          {confirmLabel}
+        </button>
+      </div>
+    </div>
+  </div>
+)
+
+const daysUntil = (dateStr: string): number => {
+  const ms = new Date(dateStr).getTime() - Date.now()
+  return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
+}
+
+const fmtDate = (dateStr: string) =>
+  new Date(dateStr).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+
+type EditField = 'status_tier' | 'city' | null
 
 const PartnerDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [partner, setPartner] = useState<Partner | null>(null)
+  const [refHistory, setRefHistory] = useState<RefCodeHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [editField, setEditField] = useState<EditField>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [resetResult, setResetResult] = useState('')
   const [showResetModal, setShowResetModal] = useState(false)
+  const [modal, setModal] = useState<ModalKind>(null)
 
   const load = () => {
     if (!id) return
     setLoading(true)
-    api.partners.get(Number(id))
-      .then((r) => setPartner(r.data))
+    Promise.all([
+      api.partners.get(Number(id)),
+      api.partners.refCodeHistory(Number(id)).catch(() => ({ data: [] })),
+    ])
+      .then(([partnerRes, historyRes]) => {
+        setPartner(partnerRes.data)
+        const hist = historyRes.data
+        setRefHistory(Array.isArray(hist) ? hist : hist?.items ?? [])
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }
@@ -83,7 +158,7 @@ const PartnerDetailPage: React.FC = () => {
     setSaving(true)
     try {
       const r = await api.partners.resetPassword(Number(id))
-      setResetResult(r.data?.temporary_password ?? 'Пароль сброшен')
+      setResetResult(r.data?.temporary_password ?? 'Письмо с инструкциями отправлено партнёру')
       setShowResetModal(true)
     } catch {
       showToast('Ошибка сброса пароля', undefined, 'error')
@@ -92,10 +167,10 @@ const PartnerDetailPage: React.FC = () => {
     }
   }
 
-  const handleVerifyEmail = async () => {
+  const handleConfirmEmail = async () => {
     if (!id) return
     try {
-      await api.partners.forceVerifyEmail(Number(id))
+      await api.partners.forceConfirmEmail(Number(id))
       showToast('Email подтверждён', undefined, 'success')
       load()
     } catch {
@@ -103,10 +178,71 @@ const PartnerDetailPage: React.FC = () => {
     }
   }
 
+  const handleBlock = async () => {
+    if (!id) return
+    setSaving(true)
+    try {
+      await api.partners.block(Number(id))
+      showToast('Партнёр заблокирован', undefined, 'success')
+      load()
+    } catch {
+      showToast('Ошибка блокировки', undefined, 'error')
+    } finally {
+      setSaving(false)
+      setModal(null)
+    }
+  }
+
+  const handleUnblock = async () => {
+    if (!id) return
+    setSaving(true)
+    try {
+      await api.partners.unblock(Number(id))
+      showToast('Партнёр разблокирован', undefined, 'success')
+      load()
+    } catch {
+      showToast('Ошибка разблокировки', undefined, 'error')
+    } finally {
+      setSaving(false)
+      setModal(null)
+    }
+  }
+
+  const handleCancelDeletion = async () => {
+    if (!id) return
+    setSaving(true)
+    try {
+      await api.partners.cancelDeletion(Number(id))
+      showToast('Удаление отменено, аккаунт восстановлен', undefined, 'success')
+      load()
+    } catch {
+      showToast('Ошибка отмены удаления', undefined, 'error')
+    } finally {
+      setSaving(false)
+      setModal(null)
+    }
+  }
+
+  const handleForceDelete = async () => {
+    if (!id) return
+    setSaving(true)
+    try {
+      await api.partners.forceDelete(Number(id))
+      showToast('Партнёр удалён', undefined, 'success')
+      navigate('/partners')
+    } catch {
+      showToast('Ошибка принудительного удаления', undefined, 'error')
+      setSaving(false)
+      setModal(null)
+    }
+  }
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Загрузка...</div>
   if (!partner) return <div style={{ padding: 40, textAlign: 'center', color: '#EF4444' }}>Партнёр не найден</div>
 
   const fullName = [partner.last_name, partner.first_name, partner.middle_name].filter(Boolean).join(' ')
+  const acctColor = stateColor[partner.account_state] ?? '#6B7280'
+  const acctLabel = stateLabel[partner.account_state] ?? partner.account_state
 
   return (
     <div style={{ maxWidth: 900 }}>
@@ -122,28 +258,28 @@ const PartnerDetailPage: React.FC = () => {
             <div style={{ fontSize: 14, color: '#6B7280', marginBottom: 8 }}>{partner.phone} · {partner.ref_code}</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <Badge label={tierLabel[partner.status_tier] ?? partner.status_tier} color={tierColor[partner.status_tier] ?? '#6B7280'} />
-              {partner.is_frozen
-                ? <Badge label="Заморожен" color="#D97706" />
-                : partner.is_active
-                ? <Badge label="Активен" color="#059669" />
-                : <Badge label="Неактивен" color="#EF4444" />}
+              <Badge label={acctLabel} color={acctColor} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => patch({ is_frozen: !partner.is_frozen })}
-              disabled={saving}
-              style={{ padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: partner.is_frozen ? '#D1FAE5' : '#FEF3C7', color: partner.is_frozen ? '#059669' : '#D97706' }}
-            >
-              {partner.is_frozen ? 'Разморозить' : 'Заморозить'}
-            </button>
-            <button
-              onClick={() => patch({ is_active: !partner.is_active })}
-              disabled={saving}
-              style={{ padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: partner.is_active ? '#FEE2E2' : '#D1FAE5', color: partner.is_active ? '#DC2626' : '#059669' }}
-            >
-              {partner.is_active ? 'Заблокировать' : 'Разблокировать'}
-            </button>
+            {partner.account_state === 'active' && (
+              <button
+                onClick={() => setModal({ type: 'block' })}
+                disabled={saving}
+                style={{ padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: '#FEE2E2', color: '#DC2626' }}
+              >
+                Заблокировать
+              </button>
+            )}
+            {partner.account_state === 'blocked' && (
+              <button
+                onClick={() => setModal({ type: 'unblock' })}
+                disabled={saving}
+                style={{ padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: '#D1FAE5', color: '#059669' }}
+              >
+                Разблокировать
+              </button>
+            )}
             <button
               onClick={handleResetPassword}
               disabled={saving}
@@ -151,9 +287,9 @@ const PartnerDetailPage: React.FC = () => {
             >
               Сбросить пароль
             </button>
-            {!partner.email_verified && (
+            {partner.account_state === 'email_unconfirmed' && (
               <button
-                onClick={handleVerifyEmail}
+                onClick={handleConfirmEmail}
                 style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #BFDBFE', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: '#EFF6FF', color: '#1D4ED8' }}
               >
                 Подтвердить email
@@ -163,11 +299,55 @@ const PartnerDetailPage: React.FC = () => {
         </div>
       </Card>
 
+      {/* Deletion section — only when soft_deleting */}
+      {partner.account_state === 'soft_deleting' && (
+        <Card title="Запрос на удаление аккаунта" borderColor="#FED7AA">
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, color: '#374151', marginBottom: 6 }}>
+                Партнёр запросил удаление аккаунта.
+              </div>
+              {partner.deletion_scheduled_at && (
+                <div style={{ fontSize: 14, color: '#374151', marginBottom: 4 }}>
+                  <strong>Дата удаления:</strong> {fmtDate(partner.deletion_scheduled_at)}
+                </div>
+              )}
+              {partner.deletion_scheduled_at && (
+                <div style={{ fontSize: 13, color: '#EA580C', fontWeight: 600 }}>
+                  Осталось {daysUntil(partner.deletion_scheduled_at)} дн.
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setModal({ type: 'cancel_deletion' })}
+                disabled={saving}
+                style={{ padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: '#D1FAE5', color: '#059669' }}
+              >
+                Отменить удаление
+              </button>
+              <button
+                onClick={() => setModal({ type: 'force_delete_1' })}
+                disabled={saving}
+                style={{ padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: '#DC2626', color: '#fff' }}
+              >
+                Удалить немедленно
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Personal data */}
       <Card title="Личные данные">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
           <Field label="Email" value={
-            <span>{partner.email} {partner.email_verified ? <span style={{ color: '#059669' }}>✓</span> : <span style={{ color: '#EF4444' }}>✗</span>}</span>
+            <span>
+              {partner.email}{' '}
+              {partner.email_verified
+                ? <span style={{ color: '#059669' }}>✓</span>
+                : <span style={{ color: '#EF4444' }}>✗</span>}
+            </span>
           } />
           <Field label="Город" value={
             editField === 'city' ? (
@@ -195,8 +375,47 @@ const PartnerDetailPage: React.FC = () => {
               </span>
             )
           } />
-          <Field label="Реферальный код" value={<span style={{ fontFamily: 'monospace' }}>{partner.ref_code}</span>} />
           <Field label="Дата регистрации" value={new Date(partner.created_at).toLocaleString('ru-RU')} />
+          <Field label="Welcome Screen пройден" value={partner.welcomed ? 'Да' : 'Нет'} />
+        </div>
+      </Card>
+
+      {/* Ref code */}
+      <Card title="Реферальный код">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
+          <Field label="Текущий код" value={<span style={{ fontFamily: 'monospace', fontSize: 15 }}>{partner.ref_code}</span>} />
+          <Field label="Изменение кода" value={
+            partner.ref_code_changed ? (
+              refHistory.length > 0 ? (
+                <span style={{ fontFamily: 'monospace', fontSize: 13 }}>
+                  {refHistory[0].old_ref_code} → {refHistory[0].new_ref_code}
+                  <span style={{ color: '#6B7280', fontFamily: 'sans-serif', fontSize: 12, marginLeft: 6 }}>
+                    {fmtDate(refHistory[0].changed_at)}
+                  </span>
+                </span>
+              ) : (
+                <span style={{ color: '#6B7280', fontSize: 13 }}>Изменён (история недоступна)</span>
+              )
+            ) : (
+              <span style={{ color: '#6B7280', fontSize: 13 }}>Изменений не было (доступна 1 замена)</span>
+            )
+          } />
+        </div>
+      </Card>
+
+      {/* Compliance */}
+      <Card title="Соответствие (RK 94-V)">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
+          <Field label="Язык приложения" value={
+            partner.language ? (languageLabel[partner.language] ?? partner.language) : '—'
+          } />
+          <Field label="Принятая оферта" value={
+            partner.consent_version && partner.consent_recorded_at
+              ? `Принял оферту v${partner.consent_version} от ${fmtDate(partner.consent_recorded_at)}`
+              : partner.consent_version
+              ? `v${partner.consent_version}`
+              : '—'
+          } />
         </div>
       </Card>
 
@@ -268,12 +487,62 @@ const PartnerDetailPage: React.FC = () => {
         </Card>
       )}
 
+      {/* Confirmation modals */}
+      {modal?.type === 'block' && (
+        <ConfirmModal
+          title="Заблокировать партнёра?"
+          body={`${fullName} потеряет доступ к приложению. Все активные сессии будут завершены.`}
+          confirmLabel="Заблокировать"
+          danger
+          onConfirm={handleBlock}
+          onCancel={() => setModal(null)}
+        />
+      )}
+      {modal?.type === 'unblock' && (
+        <ConfirmModal
+          title="Разблокировать партнёра?"
+          body={`${fullName} снова получит доступ к приложению. Партнёру будет отправлено уведомление.`}
+          confirmLabel="Разблокировать"
+          onConfirm={handleUnblock}
+          onCancel={() => setModal(null)}
+        />
+      )}
+      {modal?.type === 'cancel_deletion' && (
+        <ConfirmModal
+          title="Отменить удаление аккаунта?"
+          body={`Аккаунт ${fullName} будет восстановлен и переведён в статус «Активен». Запрос на удаление будет отменён.`}
+          confirmLabel="Отменить удаление"
+          onConfirm={handleCancelDeletion}
+          onCancel={() => setModal(null)}
+        />
+      )}
+      {modal?.type === 'force_delete_1' && (
+        <ConfirmModal
+          title="Удалить аккаунт немедленно?"
+          body={`Вы собираетесь немедленно удалить аккаунт ${fullName}. ПИИ будут обезличены, сессии завершены. Это действие необратимо.`}
+          confirmLabel="Да, продолжить"
+          danger
+          onConfirm={() => setModal({ type: 'force_delete_2' })}
+          onCancel={() => setModal(null)}
+        />
+      )}
+      {modal?.type === 'force_delete_2' && (
+        <ConfirmModal
+          title="Подтвердите окончательное удаление"
+          body="Последнее предупреждение: аккаунт будет удалён без возможности восстановления. Вы уверены?"
+          confirmLabel="Удалить навсегда"
+          danger
+          onConfirm={handleForceDelete}
+          onCancel={() => setModal(null)}
+        />
+      )}
+
       {/* Reset password modal */}
       {showResetModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 32, width: 360 }}>
-            <h3 style={{ marginTop: 0 }}>Пароль сброшен</h3>
-            <div style={{ background: '#F3F4F6', borderRadius: 6, padding: '10px 14px', fontFamily: 'monospace', fontSize: 16, marginBottom: 20 }}>
+            <h3 style={{ marginTop: 0 }}>Сброс пароля</h3>
+            <div style={{ background: '#F3F4F6', borderRadius: 6, padding: '10px 14px', fontFamily: 'monospace', fontSize: 14, marginBottom: 20 }}>
               {resetResult}
             </div>
             <button onClick={() => setShowResetModal(false)} style={{ width: '100%', padding: '9px 0', border: 'none', borderRadius: 6, background: '#1A3C6E', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>

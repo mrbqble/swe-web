@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
-import type { Partner } from '../types'
+import type { Partner, AccountState } from '../types'
 
 const TIERS = ['partner', 'expert', 'leader', 'top_partner']
 
@@ -17,6 +17,31 @@ const tierColor: Record<string, string> = {
   expert: '#2563EB',
   leader: '#7C3AED',
   top_partner: '#D97706',
+}
+
+const STATE_OPTIONS: { value: AccountState | ''; label: string }[] = [
+  { value: '', label: 'Все состояния' },
+  { value: 'email_unconfirmed', label: 'Email не подтверждён' },
+  { value: 'active', label: 'Активен' },
+  { value: 'soft_deleting', label: 'Ожидает удаления' },
+  { value: 'blocked', label: 'Заблокирован' },
+  { value: 'deleted', label: 'Удалён' },
+]
+
+const stateColor: Record<string, string> = {
+  email_unconfirmed: '#D97706',
+  active: '#059669',
+  soft_deleting: '#EA580C',
+  blocked: '#DC2626',
+  deleted: '#6B7280',
+}
+
+const stateLabel: Record<string, string> = {
+  email_unconfirmed: 'Email не подтверждён',
+  active: 'Активен',
+  soft_deleting: 'Ожидает удаления',
+  blocked: 'Заблокирован',
+  deleted: 'Удалён',
 }
 
 const Badge: React.FC<{ label: string; color: string }> = ({ label, color }) => (
@@ -35,6 +60,11 @@ const Badge: React.FC<{ label: string; color: string }> = ({ label, color }) => 
   </span>
 )
 
+const daysUntil = (dateStr: string): number => {
+  const ms = new Date(dateStr).getTime() - Date.now()
+  return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
+}
+
 const PartnersPage: React.FC = () => {
   const navigate = useNavigate()
   const [partners, setPartners] = useState<Partner[]>([])
@@ -45,20 +75,19 @@ const PartnersPage: React.FC = () => {
   const [search, setSearch] = useState('')
   const [city, setCity] = useState('')
   const [statusTier, setStatusTier] = useState('')
-  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'frozen'>('all')
+  const [accountState, setAccountState] = useState<AccountState | ''>('')
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const LIMIT = 50
 
   const load = useCallback(
-    (p: number, s: string, c: string, tier: string, af: 'all' | 'active' | 'frozen') => {
+    (p: number, s: string, c: string, tier: string, state: AccountState | '') => {
       setLoading(true)
       const params: Record<string, unknown> = { page: p, limit: LIMIT }
       if (s) params.search = s
       if (c) params.city = c
       if (tier) params.status_tier = tier
-      if (af === 'active') params.is_active = true
-      if (af === 'frozen') params.is_frozen = true
+      if (state) params.account_state = state
       api.partners
         .list(params as any)
         .then((r) => {
@@ -73,15 +102,15 @@ const PartnersPage: React.FC = () => {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => load(page, search, city, statusTier, activeFilter), 400)
+    debounceRef.current = setTimeout(() => load(page, search, city, statusTier, accountState), 400)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [page, search, city, statusTier, activeFilter, load])
+  }, [page, search, city, statusTier, accountState, load])
 
   const reset = () => {
     setSearch('')
     setCity('')
     setStatusTier('')
-    setActiveFilter('all')
+    setAccountState('')
     setPage(1)
   }
 
@@ -115,24 +144,15 @@ const PartnersPage: React.FC = () => {
             <option key={t} value={t}>{tierLabel[t]}</option>
           ))}
         </select>
-        <div style={{ display: 'flex', gap: 0, border: '1px solid #D1D5DB', borderRadius: 6, overflow: 'hidden' }}>
-          {(['all', 'active', 'frozen'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => { setActiveFilter(v); setPage(1) }}
-              style={{
-                padding: '7px 14px',
-                border: 'none',
-                background: activeFilter === v ? '#1A3C6E' : '#fff',
-                color: activeFilter === v ? '#fff' : '#374151',
-                cursor: 'pointer',
-                fontSize: 13,
-              }}
-            >
-              {v === 'all' ? 'Все' : v === 'active' ? 'Активные' : 'Заморожены'}
-            </button>
+        <select
+          value={accountState}
+          onChange={(e) => { setAccountState(e.target.value as AccountState | ''); setPage(1) }}
+          style={{ padding: '7px 12px', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13 }}
+        >
+          {STATE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
           ))}
-        </div>
+        </select>
         <button
           onClick={reset}
           style={{ padding: '7px 14px', border: '1px solid #D1D5DB', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 13 }}
@@ -146,7 +166,7 @@ const PartnersPage: React.FC = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#F3F4F6' }}>
-              {['ID', 'ФИО', 'Телефон', 'Email', 'Реф-код', 'Спонсор', 'Город', 'Статус', 'Активен', 'Зарег.'].map((h) => (
+              {['ID', 'ФИО', 'Телефон', 'Реф-код', 'Спонсор', 'Город', 'Статус', 'Состояние', 'Зарег.'].map((h) => (
                 <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>
                   {h}
                 </th>
@@ -155,51 +175,47 @@ const PartnersPage: React.FC = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Загрузка...</td></tr>
+              <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Загрузка...</td></tr>
             ) : partners.length === 0 ? (
-              <tr><td colSpan={10} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Нет данных</td></tr>
-            ) : partners.map((p) => (
-              <tr
-                key={p.id}
-                onClick={() => navigate(`/partners/${p.id}`)}
-                style={{ borderTop: '1px solid #F3F4F6', cursor: 'pointer' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#F9FAFB')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = '')}
-              >
-                <td style={{ padding: '9px 12px', color: '#6B7280' }}>{p.id}</td>
-                <td style={{ padding: '9px 12px', fontWeight: 500, color: '#111827' }}>
-                  {[p.last_name, p.first_name, p.middle_name].filter(Boolean).join(' ')}
-                </td>
-                <td style={{ padding: '9px 12px' }}>{p.phone}</td>
-                <td style={{ padding: '9px 12px' }}>
-                  {p.email_verified ? (
-                    <span title={p.email}>✓ {p.email}</span>
-                  ) : (
-                    <span style={{ color: '#EF4444' }}>✗ {p.email}</span>
-                  )}
-                </td>
-                <td style={{ padding: '9px 12px', fontFamily: 'monospace' }}>{p.ref_code}</td>
-                <td style={{ padding: '9px 12px', color: '#6B7280' }}>
-                  {p.sponsor ? p.sponsor.ref_code : '—'}
-                </td>
-                <td style={{ padding: '9px 12px' }}>{p.city ?? '—'}</td>
-                <td style={{ padding: '9px 12px' }}>
-                  <Badge label={tierLabel[p.status_tier] ?? p.status_tier} color={tierColor[p.status_tier] ?? '#6B7280'} />
-                </td>
-                <td style={{ padding: '9px 12px' }}>
-                  {p.is_frozen ? (
-                    <Badge label="Заморожен" color="#D97706" />
-                  ) : p.is_active ? (
-                    <Badge label="Активен" color="#059669" />
-                  ) : (
-                    <Badge label="Неактивен" color="#EF4444" />
-                  )}
-                </td>
-                <td style={{ padding: '9px 12px', color: '#6B7280', whiteSpace: 'nowrap' }}>
-                  {new Date(p.created_at).toLocaleDateString('ru-RU')}
-                </td>
-              </tr>
-            ))}
+              <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Нет данных</td></tr>
+            ) : partners.map((p) => {
+              const color = stateColor[p.account_state] ?? '#6B7280'
+              const label = stateLabel[p.account_state] ?? p.account_state
+              return (
+                <tr
+                  key={p.id}
+                  onClick={() => navigate(`/partners/${p.id}`)}
+                  style={{ borderTop: '1px solid #F3F4F6', cursor: 'pointer' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#F9FAFB')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = '')}
+                >
+                  <td style={{ padding: '9px 12px', color: '#6B7280' }}>{p.id}</td>
+                  <td style={{ padding: '9px 12px', fontWeight: 500, color: '#111827' }}>
+                    {[p.last_name, p.first_name, p.middle_name].filter(Boolean).join(' ')}
+                  </td>
+                  <td style={{ padding: '9px 12px' }}>{p.phone}</td>
+                  <td style={{ padding: '9px 12px', fontFamily: 'monospace' }}>{p.ref_code}</td>
+                  <td style={{ padding: '9px 12px', color: '#6B7280' }}>
+                    {p.sponsor ? p.sponsor.ref_code : '—'}
+                  </td>
+                  <td style={{ padding: '9px 12px' }}>{p.city ?? '—'}</td>
+                  <td style={{ padding: '9px 12px' }}>
+                    <Badge label={tierLabel[p.status_tier] ?? p.status_tier} color={tierColor[p.status_tier] ?? '#6B7280'} />
+                  </td>
+                  <td style={{ padding: '9px 12px' }}>
+                    <Badge label={label} color={color} />
+                    {p.account_state === 'soft_deleting' && p.deletion_scheduled_at && (
+                      <div style={{ fontSize: 11, color: '#EA580C', marginTop: 2 }}>
+                        {daysUntil(p.deletion_scheduled_at)} дн. до удаления
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: '9px 12px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                    {new Date(p.created_at).toLocaleDateString('ru-RU')}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

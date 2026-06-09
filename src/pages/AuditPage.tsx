@@ -4,6 +4,24 @@ import type { AuditEntry } from '../types'
 
 const TARGET_TYPES = ['partner', 'order', 'inventory', 'faq', 'notification', 'ip_too']
 
+const ACTION_TYPES = [
+  'block',
+  'unblock',
+  'force_confirm_email',
+  'reset_password',
+  'cancel_deletion',
+  'force_delete',
+  'update_partner',
+  'update_order',
+  'update_inventory',
+  'create_faq',
+  'update_faq',
+  'delete_faq',
+  'broadcast',
+  'approve_ip_too',
+  'reject_ip_too',
+]
+
 const DiffView: React.FC<{ before?: Record<string, unknown>; after?: Record<string, unknown> }> = ({ before, after }) => {
   if (!before && !after) return <span style={{ color: '#9CA3AF' }}>—</span>
 
@@ -20,7 +38,6 @@ const DiffView: React.FC<{ before?: Record<string, unknown>; after?: Record<stri
         if (bStr === aStr) return null
 
         if (bv === undefined) {
-          // Added
           return (
             <div key={k} style={{ color: '#059669' }}>
               + {k}: {aStr}
@@ -28,14 +45,12 @@ const DiffView: React.FC<{ before?: Record<string, unknown>; after?: Record<stri
           )
         }
         if (av === undefined) {
-          // Removed
           return (
             <div key={k} style={{ color: '#DC2626' }}>
               - {k}: {bStr}
             </div>
           )
         }
-        // Changed
         return (
           <div key={k}>
             <span style={{ color: '#DC2626' }}>- {k}: {bStr}</span>
@@ -59,6 +74,7 @@ const AuditPage: React.FC = () => {
 
   const [adminId, setAdminId] = useState('')
   const [targetType, setTargetType] = useState('')
+  const [actionType, setActionType] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
@@ -67,6 +83,7 @@ const AuditPage: React.FC = () => {
     const params: any = { page: p, limit: LIMIT }
     if (adminId) params.admin_id = Number(adminId)
     if (targetType) params.target_type = targetType
+    if (actionType) params.action_type = actionType
     if (dateFrom) params.date_from = dateFrom
     if (dateTo) params.date_to = dateTo
     api.audit.list(params)
@@ -76,7 +93,7 @@ const AuditPage: React.FC = () => {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [adminId, targetType, dateFrom, dateTo])
+  }, [adminId, targetType, actionType, dateFrom, dateTo])
 
   useEffect(() => { load(page) }, [page, load])
 
@@ -100,8 +117,16 @@ const AuditPage: React.FC = () => {
           onChange={(e) => { setTargetType(e.target.value); setPage(1) }}
           style={{ padding: '7px 12px', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13 }}
         >
-          <option value="">Все типы</option>
+          <option value="">Все объекты</option>
           {TARGET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select
+          value={actionType}
+          onChange={(e) => { setActionType(e.target.value); setPage(1) }}
+          style={{ padding: '7px 12px', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13 }}
+        >
+          <option value="">Все действия</option>
+          {ACTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <input
           type="date"
@@ -116,7 +141,7 @@ const AuditPage: React.FC = () => {
           style={{ padding: '7px 10px', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13 }}
         />
         <button
-          onClick={() => { setAdminId(''); setTargetType(''); setDateFrom(''); setDateTo(''); setPage(1) }}
+          onClick={() => { setAdminId(''); setTargetType(''); setActionType(''); setDateFrom(''); setDateTo(''); setPage(1) }}
           style={{ padding: '7px 14px', border: '1px solid #D1D5DB', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 13 }}
         >
           Сбросить

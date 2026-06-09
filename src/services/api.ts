@@ -43,10 +43,22 @@ export const api = {
     get: (id: number) => instance.get(`/admin/partners/${id}`),
     update: (id: number, data: Partial<PartnerUpdate>) =>
       instance.patch(`/admin/partners/${id}`, data),
-    forceVerifyEmail: (id: number) =>
-      instance.post(`/admin/partners/${id}/force-verify-email`),
+    block: (id: number) =>
+      instance.post(`/admin/partners/${id}/block`),
+    unblock: (id: number) =>
+      instance.post(`/admin/partners/${id}/unblock`),
+    forceConfirmEmail: (id: number) =>
+      instance.post(`/admin/partners/${id}/force-confirm-email`),
     resetPassword: (id: number) =>
       instance.post(`/admin/partners/${id}/reset-password`),
+    cancelDeletion: (id: number) =>
+      // TODO: backend endpoint pending — POST /admin/partners/{id}/cancel-deletion
+      instance.post(`/admin/partners/${id}/cancel-deletion`),
+    forceDelete: (id: number) =>
+      // TODO: backend endpoint pending — DELETE /admin/partners/{id}/force-delete
+      instance.delete(`/admin/partners/${id}/force-delete`),
+    refCodeHistory: (id: number) =>
+      instance.get(`/admin/partners/${id}/ref-code-history`),
   },
   ipToo: {
     pending: () => instance.get('/admin/ip-too/pending'),

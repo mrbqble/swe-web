@@ -1,0 +1,45 @@
+---
+description: swe-web — Create React App, TypeScript, structure and conventions
+alwaysApply: true
+---
+
+# swe-web — React (Create React App)
+
+## Stack
+- **Framework:** Create React App (react-scripts 5)
+- **Language:** TypeScript 4.9
+- **HTTP:** axios (via `src/services/`)
+- **Styling:** CSS/styles in `src/styles/`
+
+## Commands
+```bash
+npm start    # dev server (port 3000)
+npm run build  # production build → /build
+npm test     # Jest + React Testing Library
+```
+
+## Project structure
+```
+src/
+  App.tsx
+  components/   # Reusable UI components
+  pages/        # Page-level components (route targets)
+  services/     # API calls and business logic (axios instances)
+  styles/       # Global and component styles
+  types.ts      # Shared TypeScript types
+  index.tsx     # Entry point
+public/         # Static assets
+```
+
+## Conventions
+- Functional components only, hooks-based
+- API calls in `src/services/` — never inline fetch/axios in components
+- Pages in `src/pages/`, reusable pieces in `src/components/`
+- Types centralized in `src/types.ts` or colocated with component
+- No class components
+
+## CRA limitations to be aware of
+- No server-side rendering (client-only)
+- Custom webpack config requires ejecting (avoid — use CRACO if needed)
+- Environment variables must be prefixed `REACT_APP_` to be accessible in code
+- `.env` file at project root for local config
